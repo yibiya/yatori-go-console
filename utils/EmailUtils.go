@@ -6,6 +6,7 @@ import (
 	"html"
 	"strings"
 
+	lg "github.com/yatori-dev/yatori-go-core/utils/log"
 	"gopkg.in/gomail.v2"
 )
 
@@ -39,7 +40,8 @@ func SendMail(host string, port int, userName, password string, toMail []string,
 	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 
 	if err := d.DialAndSend(m); err != nil {
-		panic(err)
+		//panic(err)
+		lg.Print(lg.INFO, fmt.Sprintf("邮件发送失败-DialAndSend失败: host=%s port=%d user=%s err=%w", host, port, userName, err))
 	}
 }
 

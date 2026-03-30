@@ -228,10 +228,10 @@ func fastModeAction(setting config.Setting, user *config.User, UserCache *hqkjAp
 				return
 			}
 			//检查是否看完
-			if progress >= 100 {
-				videosLock.Done()
-				return
-			}
+			//if progress >= 100 {
+			//	videosLock.Done()
+			//	return
+			//}
 
 			var submitResult string
 			//这里采用提交学后进行检查，防止提交的进度没有记录问题
