@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	time2 "time"
 	"yatori-go-console/config"
@@ -68,11 +69,25 @@ func userBlock(setting config.Setting, user *config.User, cache *enaeaApi.EnaeaU
 	for _, course := range projectList {
 		//过滤项目---------------------------------
 		//排除指定项目
-		if len(user.CoursesCustom.ExcludeCourses) != 0 && config.CmpCourse(course.ClusterName, user.CoursesCustom.ExcludeCourses) {
+		excludeCourses := []string{}
+		includeCourses := []string{}
+		for _, cours := range user.CoursesCustom.ExcludeCourses {
+			split := strings.Split(cours, "-->")
+			if len(split) >= 1 {
+				excludeCourses = append(excludeCourses, split[0])
+			}
+		}
+		for _, cours := range user.CoursesCustom.IncludeCourses {
+			split := strings.Split(cours, "-->")
+			if len(split) >= 1 {
+				includeCourses = append(includeCourses, split[0])
+			}
+		}
+		if len(excludeCourses) != 0 && config.CmpCourse(course.ClusterName, excludeCourses) {
 			continue
 		}
 		//包含指定课程
-		if len(user.CoursesCustom.IncludeCourses) != 0 && !config.CmpCourse(course.ClusterName, user.CoursesCustom.IncludeCourses) {
+		if len(includeCourses) != 0 && !config.CmpCourse(course.ClusterName, includeCourses) {
 			continue
 		}
 		courseList, err := enaea.CourseListAction(cache, course.CircleId)
@@ -81,7 +96,30 @@ func userBlock(setting config.Setting, user *config.User, cache *enaeaApi.EnaeaU
 			os.Exit(0)
 		}
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Account, lg.Default, "] ", lg.Purple, "正在学习项目", " 【"+course.ClusterName+"】 ")
+
+		excludeTitleTag := []string{}
+		includeTitleTag := []string{}
+		for _, cours := range user.CoursesCustom.ExcludeCourses {
+			split := strings.Split(cours, "-->")
+			if len(split) >= 2 {
+				excludeTitleTag = append(excludeTitleTag, split[0])
+			}
+		}
+		for _, cours := range user.CoursesCustom.IncludeCourses {
+			split := strings.Split(cours, "-->")
+			if len(split) >= 2 {
+				includeTitleTag = append(includeTitleTag, split[1])
+			}
+		}
+
 		for _, item := range courseList { //遍历所有待刷视频
+			if len(excludeTitleTag) != 0 && config.CmpCourse(item.TitleTag, excludeTitleTag) {
+				continue
+			}
+			//包含指定课程
+			if len(includeTitleTag) != 0 && !config.CmpCourse(item.TitleTag, includeTitleTag) {
+				continue
+			}
 			nodeListStudy(setting, user, cache, &item) //多携程刷课
 		}
 	}
