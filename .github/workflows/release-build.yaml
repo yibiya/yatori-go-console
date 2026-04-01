@@ -9,7 +9,7 @@ on:
       tag_name:
         description: 'Tag name for the release'
         required: true
-        default: 'v2.6.2-Beta.6'
+        default: 'v2.6.2-Beta.7'
 
 permissions:
   contents: write
@@ -22,7 +22,7 @@ env:
   VERSION: ${{ github.event.inputs.tag_name || github.ref_name }}
   RELEASE_DIR: release
   RELEASE_NOTICES: |
-    - [👏] 优化学习公社排除功能，可进行子节点排除，使用“-->”衔接即可（比如：中山大学干部教育培训2026年度在线学习-->第二单元)
+    - [‍🔧] 修复IP代理功能无法正常使用BUG
 
     
     学习通用户注意：
