@@ -23,6 +23,7 @@ env:
   RELEASE_DIR: release
   RELEASE_NOTICES: |
     - [‍🔧] 修复IP代理功能无法正常使用BUG
+    - [‍🔧] 修复海旗科技因密码带特殊字符导致无法正常登录问题
 
     
     学习通用户注意：
