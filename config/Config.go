@@ -32,6 +32,7 @@ type BasicSetting struct {
 	LogLevel       string `json:"logLevel,omitempty" yaml:"logLevel"`                         //日志等级，默认INFO，DEBUG为找BUG调式用的，日志内容较详细，默认为INFO
 	LogModel       int    `json:"logModel" yaml:"logModel"`                                   //日志模式，0代表以视频提交学时基准打印日志，1代表以一个课程为基准打印信息，默认为0
 	WebModel       int    `json:"webModel" yaml:"webModel"`
+	AdminPassword  string `json:"adminPassword,omitempty" yaml:"adminPassword"`
 }
 type AiSetting struct {
 	AiType ctype.AiType `json:"aiType" yaml:"aiType"`

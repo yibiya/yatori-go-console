@@ -59,7 +59,8 @@ func UserLoginOperation(users []config.User) []*xuexitongApi.XueXiTUserCache {
 
 			if loginError != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Name, lg.White, "] ", lg.Red, loginError.Error())
-				os.Exit(0) //登录失败直接退出
+				// os.Exit(0) //登录失败直接退出
+				continue
 			}
 			// go keepAliveLogin(cache) //携程保活
 			UserCaches = append(UserCaches, cache)
@@ -71,6 +72,7 @@ func UserLoginOperation(users []config.User) []*xuexitongApi.XueXiTUserCache {
 // 开始刷课模块
 func RunBrushOperation(setting config.Setting, users []config.User, userCaches []*xuexitongApi.XueXiTUserCache) {
 	for i, _ := range userCaches {
+		lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCaches[i].Name, lg.Default, "] ", "开始执行刷课任务扫描...")
 		usersLock.Add(1)
 		go UserBlock(setting, &users[i], userCaches[i])
 	}
