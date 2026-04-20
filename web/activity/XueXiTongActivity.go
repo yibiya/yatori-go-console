@@ -56,6 +56,9 @@ func (activity *XXTActivity) Start() error {
 		}
 	}
 	activity.IsRunning = true
+	defer func() {
+		activity.IsRunning = false
+	}()
 	return activity.userBlock() //开刷
 }
 

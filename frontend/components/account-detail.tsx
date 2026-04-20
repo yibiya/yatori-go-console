@@ -36,6 +36,8 @@ type EditableForm = {
     includeCourses: string[]
     excludeCourses: string[]
     studyTime: string
+    autoRunStartTime: string
+    autoRunEndTime: string
     videoModel: string
     autoExam: string
     examAutoSubmit: string
@@ -125,6 +127,10 @@ function toNumberString(value: unknown) {
     return value === undefined || value === null ? "" : String(value)
 }
 
+function isValidClockTime(value: string) {
+    return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)
+}
+
 function getOptionLabel(options: Option[], value: unknown, fallback = "未设置") {
     const match = options.find((item) => item.value === String(value))
     return match?.label ?? fallback
@@ -172,6 +178,8 @@ function buildEditableForm(user: any): EditableForm {
         includeCourses: toStringArray(coursesCustom?.includeCourses),
         excludeCourses: toStringArray(coursesCustom?.excludeCourses),
         studyTime: coursesCustom?.studyTime ?? "",
+        autoRunStartTime: coursesCustom?.autoRunStartTime ?? "",
+        autoRunEndTime: coursesCustom?.autoRunEndTime ?? "",
         videoModel: toNumberString(coursesCustom?.videoModel),
         autoExam: toNumberString(coursesCustom?.autoExam),
         examAutoSubmit: toNumberString(coursesCustom?.examAutoSubmit),
@@ -381,6 +389,25 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                 return
             }
 
+            const autoRunStartTime = form.autoRunStartTime.trim()
+            const autoRunEndTime = form.autoRunEndTime.trim()
+            if ((autoRunStartTime && !autoRunEndTime) || (!autoRunStartTime && autoRunEndTime)) {
+                toast({
+                    title: "保存失败",
+                    description: "自动执行时间段需要同时设置开始时间和结束时间",
+                    variant: "destructive",
+                })
+                return
+            }
+            if ((autoRunStartTime && !isValidClockTime(autoRunStartTime)) || (autoRunEndTime && !isValidClockTime(autoRunEndTime))) {
+                toast({
+                    title: "保存失败",
+                    description: "自动执行时间格式必须为 HH:MM",
+                    variant: "destructive",
+                })
+                return
+            }
+
             const response = await updateAccount({
                 uid: form.uid,
                 accountType: form.accountType,
@@ -391,6 +418,8 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                 informEmails: parseLineText(form.informEmailsText),
                 coursesCustom: {
                     studyTime: form.studyTime.trim(),
+                    autoRunStartTime,
+                    autoRunEndTime,
                     videoModel: Number(form.videoModel || 0),
                     autoExam: Number(form.autoExam || 0),
                     examAutoSubmit: Number(form.examAutoSubmit || 0),
@@ -662,6 +691,32 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                                     <Label htmlFor="studyTime">学习时段</Label>
                                     <Input id="studyTime" value={form.studyTime} onChange={(e) => updateForm("studyTime", e.target.value)}/>
                                     <p className="text-xs leading-5 text-muted-foreground">按平台支持的时间范围填写，用于限制刷课时间段。</p>
+                                </div>
+                                <div className="space-y-4 rounded-2xl border p-4 sm:col-span-2">
+                                    <div>
+                                        <p className="text-sm font-medium">自动执行时间段</p>
+                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">设置后系统会每天仅在这个时间段内自动执行。支持跨天，例如 22:00 到 02:00。</p>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2 rounded-2xl bg-muted/30 p-4">
+                                            <Label htmlFor="autoRunStartTime">开始时间</Label>
+                                            <Input
+                                                id="autoRunStartTime"
+                                                type="time"
+                                                value={form.autoRunStartTime}
+                                                onChange={(e) => updateForm("autoRunStartTime", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2 rounded-2xl bg-muted/30 p-4">
+                                            <Label htmlFor="autoRunEndTime">结束时间</Label>
+                                            <Input
+                                                id="autoRunEndTime"
+                                                type="time"
+                                                value={form.autoRunEndTime}
+                                                onChange={(e) => updateForm("autoRunEndTime", e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-4 rounded-2xl border p-4 sm:col-span-2">
                                     <div>

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 	"yatori-go-console/config"
 	"yatori-go-console/dao"
 	"yatori-go-console/entity/dto"
@@ -292,6 +293,13 @@ func UpdateUserService(c *gin.Context) {
 		})
 		return
 	}
+	if err := validateAutoExecutionWindow(req.CoursesCustom.AutoRunStartTime, req.CoursesCustom.AutoRunEndTime); err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
 
 	user, err := getLocalConfigUserByUID(req.Uid)
 	if err != nil {
@@ -365,6 +373,13 @@ func UpdateUserService(c *gin.Context) {
 	}
 
 	if _, err := syncUsersFromConfigManager(); err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+	if err := syncAutoExecutionSchedules(time.Now()); err != nil {
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    500,
 			Message: err.Error(),
@@ -487,7 +502,7 @@ func StopBrushService(c *gin.Context) {
 	if xxt, ok := (*userActivity).(*activity.XXTActivity); ok {
 		xxt.IsRunning = false
 	} else if yinghua, ok := (*userActivity).(*activity.YingHuaActivity); ok {
-		yinghua.IsRunning = true
+		yinghua.IsRunning = false
 	}
 	(*userActivity).Stop()
 	//userActivity.Kill()
