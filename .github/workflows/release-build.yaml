@@ -68,10 +68,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             arch: amd64
             goos: linux
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             arch: arm64
             goos: linux
           - os: windows-latest
