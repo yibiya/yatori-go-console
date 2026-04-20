@@ -42,7 +42,7 @@ help:
 	@echo "make - 构建前端并编译所有平台的二进制文件"
 	@echo "make build-all - 编译 Go 代码，生成所有平台的二进制文件"
 	@echo "make build-linux - 编译 Linux AMD64 二进制文件"
-	@echo "make build-linux-arm64 - 编译 Linux ARM64 二进制文件 (当前环境支持)"
+	@echo "make build-linux-arm64 - 编译 Linux ARM64 二进制文件"
 	@echo "make build-windows - 编译 Windows AMD64 二进制文件"
 	@echo "make frontend-build - 编译前端并输出到 assets/web"
 	@echo "make run - 直接运行 Go 代码"
