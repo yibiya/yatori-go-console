@@ -251,4 +251,6 @@ jobs:
           body: ${{ env.RELEASE_NOTICES }}
           draft: false
           prerelease: false
-          files: ${{ env.RELEASE_DIR }}/**/*  # 文件发布目录
+          files: |
+            release/**/*.tar.gz
+            release/**/*.zip
