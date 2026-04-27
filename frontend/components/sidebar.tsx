@@ -1,28 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, FileQuestion, ChevronLeft, ChevronRight, Menu, X, LockKeyhole } from "lucide-react"
+import { Users, FileQuestion, ChevronLeft, ChevronRight, Menu, X } from "lucide-react"
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [adminPassword, setAdminPassword] = useState("")
   const pathname = usePathname()
-
-  // 初始化加载密码
-  useEffect(() => {
-    const savedPass = localStorage.getItem('yatori-admin-password') || ""
-    setAdminPassword(savedPass)
-  }, [])
-
-  // 保存密码到本地
-  const handlePasswordChange = (val: string) => {
-    setAdminPassword(val)
-    localStorage.setItem('yatori-admin-password', val)
-  }
 
   const navItems = [
     {
@@ -137,31 +124,14 @@ export function Sidebar() {
         </nav>
 
         {/* 底部信息 */}
-        <div className="p-4 border-t border-sidebar-border space-y-4">
-          {!collapsed && (
-            <div className="space-y-2 px-1">
-              <div className="flex items-center gap-2 text-xs font-medium text-sidebar-foreground/60">
-                <LockKeyhole className="h-3 w-3" />
-                <span>管理权限</span>
-              </div>
-              <input
-                type="password"
-                placeholder="输入管理员密码"
-                value={adminPassword}
-                onChange={(e) => handlePasswordChange(e.target.value)}
-                className="w-full bg-sidebar-accent/50 border border-sidebar-border rounded-md px-2 py-1.5 text-xs text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
-              />
-            </div>
-          )}
-
+        <div className="p-4 border-t border-sidebar-border">
           {!collapsed ? (
             <div className="text-xs text-sidebar-foreground/50 animate-in fade-in-50 duration-200">
               <p>版本 v1.0.0</p>
               <p className="mt-1">© 2025 Yatori</p>
             </div>
           ) : (
-            <div className="hidden lg:flex flex-col items-center gap-4">
-              <LockKeyhole className="h-4 w-4 text-sidebar-foreground/40" />
+            <div className="hidden lg:flex justify-center">
               <div className="h-2 w-2 rounded-full bg-sidebar-primary animate-pulse"></div>
             </div>
           )}

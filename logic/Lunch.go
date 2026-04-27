@@ -122,10 +122,6 @@ func Lunch() {
 		webModel := config.GetUserInput("是否开启 Web 模式 (0-关闭, 1-开启): ")
 		if webModel == "1" {
 			configJson.Setting.BasicSetting.WebModel = 1
-			adminPass := config.GetUserInput("请设置 Web 模式管理员密码 (可留空): ")
-			if adminPass != "" {
-				configJson.Setting.BasicSetting.AdminPassword = adminPass
-			}
 
 			// 自动清理占位账号，防止校验报错
 			newUsers := []config.User{}
