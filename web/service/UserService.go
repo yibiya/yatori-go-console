@@ -351,14 +351,14 @@ func UpdateUserService(c *gin.Context) {
 		return
 	}
 
-	if editPass := strings.TrimSpace(c.GetHeader("X-Edit-Pass")); editPass != "" {
-		if !verifyEditPassword(*user, editPass) {
-			c.JSON(http.StatusOK, vo.Response{
-				Code:    401,
-				Message: "权限验证失败",
-			})
-			return
-		}
+	// 权限验证：如果设置了管理员密码，则强制验证
+	editPass := strings.TrimSpace(c.GetHeader("X-Edit-Pass"))
+	if !verifyEditPassword(*user, editPass) {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    401,
+			Message: "权限验证失败，请在设置中提供正确的管理员密码",
+		})
+		return
 	}
 
 	if _, err := updateLocalConfigUser(req.Uid, func(localUser *dto.ConfigManagerUser) error {

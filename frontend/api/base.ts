@@ -13,7 +13,14 @@ const apiClient = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
-    // 可以在这里添加认证信息，如token
+    // 自动从本地存储读取管理员密码并设置到请求头
+    if (typeof window !== 'undefined') {
+      const adminPass = localStorage.getItem('yatori-admin-password') || ''
+      if (adminPass) {
+        config.headers['X-Edit-Pass'] = adminPass
+        config.headers['X-Admin-Pass'] = adminPass
+      }
+    }
     return config
   },
   (error) => {
