@@ -13,11 +13,8 @@ on:
 
 permissions:
   contents: write
-#  - [👏]
-#  - [‍🔧]
-#  - [☠️]
+
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_NAME: ${{ github.event.repository.name }}
   BUILD_DATE: ${{ github.run_id }}
   VERSION: ${{ github.event.inputs.tag_name || github.ref_name }}
@@ -43,12 +40,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9
 
       - name: Install dependencies
         run: cd frontend && pnpm install
@@ -156,31 +153,42 @@ jobs:
       - name: Build Linux
         if: runner.os=='Linux' && matrix.arch=='amd64'
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=${{matrix.arch}} go build \
-            -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{matrix.goos}}-${{matrix.arch}}-release/${{ env.PROJECT_NAME }}
+          go build -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{matrix.goos}}-${{matrix.arch}}-release/${{ env.PROJECT_NAME }}
+        env:
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
 
       # Build Linux
       - name: Build Linux
         if: runner.os=='Linux' && matrix.arch=='arm64'
         run: |
-          CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=${{matrix.arch}} go build \
-            -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{matrix.goos}}-${{matrix.arch}}-release/${{ env.PROJECT_NAME }}
+          go build -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{matrix.goos}}-${{matrix.arch}}-release/${{ env.PROJECT_NAME }}
+        env:
+          CC: aarch64-linux-gnu-gcc
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
 
       # Build Windows
       - name: Build Windows
         if: runner.os == 'Windows'
         run: |
-          set CGO_ENABLED=1
-          set GOOS=windows 
-          set GOARCH=${{matrix.arch}} 
           go build -o ${{ env.RELEASE_DIR }}\yatori-go-console.${{env.VERSION}}-${{matrix.goos}}-${{matrix.arch}}-release\${{ env.PROJECT_NAME }}.exe
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: ${{ matrix.arch }}
 
       # 🧱 构建 Macos
       - name: Build macOS
         if: matrix.goos == 'darwin'
         run: |
-          CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build \
-            -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{ matrix.goos }}-${{ matrix.arch }}-release/${{ env.PROJECT_NAME }}
+          go build -o ${{ env.RELEASE_DIR }}/yatori-go-console.${{env.VERSION}}-${{ matrix.goos }}-${{ matrix.arch }}-release/${{ env.PROJECT_NAME }}
+        env:
+          CGO_ENABLED: 1
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
 
       - name: Create release tar
         if: runner.os=='Linux'
