@@ -17,6 +17,7 @@ permissions:
 #  - [‍🔧]
 #  - [☠️]
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_NAME: ${{ github.event.repository.name }}
   BUILD_DATE: ${{ github.run_id }}
   VERSION: ${{ github.event.inputs.tag_name || github.ref_name }}
