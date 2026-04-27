@@ -126,13 +126,13 @@ func (activity *XXTActivity) userBlock() error {
 
 func (activity *XXTActivity) nodeListStudy(user *config.User, userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse) {
 	//过滤课程---------------------------------
-	for i, uid := range user.CoursesCustom.IncludeCourses {
-		if uid == courseItem.Key {
-			break
-		}
-		if i+1 == len(user.CoursesCustom.IncludeCourses) {
-			return
-		}
+	//排除指定课程
+	if len(user.CoursesCustom.ExcludeCourses) != 0 && config.CmpCourse(courseItem.CourseName, user.CoursesCustom.ExcludeCourses) {
+		return
+	}
+	//包含指定课程
+	if len(user.CoursesCustom.IncludeCourses) != 0 && !config.CmpCourse(courseItem.CourseName, user.CoursesCustom.IncludeCourses) {
+		return
 	}
 
 	if !activity.IsRunning { //打断
