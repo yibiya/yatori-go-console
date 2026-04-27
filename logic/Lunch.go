@@ -126,7 +126,18 @@ func Lunch() {
 			if adminPass != "" {
 				configJson.Setting.BasicSetting.AdminPassword = adminPass
 			}
-			lg.Print(lg.INFO, lg.Green, "Web 模式已开启，启动后请访问 http://localhost:8080/web 进行账号配置")
+
+			// 自动清理占位账号，防止校验报错
+			newUsers := []config.User{}
+			for _, u := range configJson.Users {
+				if u.Account != "账号" && u.Account != "你的账号" && u.Account != "你的手机号" {
+					newUsers = append(newUsers, u)
+				}
+			}
+			configJson.Users = newUsers
+
+			lg.Print(lg.INFO, lg.Green, "基础配置已更新，Web 模式已开启。")
+			lg.Print(lg.INFO, lg.Green, "启动后请访问 http://localhost:8080/web 进行账号配置")
 		} else {
 			configJson.Setting.BasicSetting.WebModel = 0
 			lg.Print(lg.INFO, lg.Cyan, "已选择命令行模式，请稍后根据报错提示手动修改 config.yaml 中的账号信息")
@@ -238,6 +249,9 @@ func brushBlock(configData *config.JSONDataForConfig) {
 // configJsonCheck 配置文件检测检验
 func configJsonCheck(configData *config.JSONDataForConfig) {
 	if len(configData.Users) == 0 {
+		if configData.Setting.BasicSetting.WebModel == 1 {
+			return
+		}
 		lg.Print(lg.INFO, lg.BoldRed, "请先在config文件中配置好相应账号")
 		os.Exit(0)
 	}
