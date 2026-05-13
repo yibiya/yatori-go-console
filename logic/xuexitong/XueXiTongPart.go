@@ -222,7 +222,7 @@ func writeCourseWorkAndExam(setting config.Setting, user *config.User, userCache
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Red, "拉取考试列表失败,已自动跳过")
 			} else {
 				for _, exam := range examList {
-					if exam.Status != "待做" && exam.Status != "待重考"  {
+					if exam.Status != "待做" && exam.Status != "待重考" {
 						continue
 					}
 					//进入考试
@@ -957,6 +957,7 @@ func ExecuteBBS(user *config.User, cache *xuexitongApi.XueXiTUserCache, setting 
 	if err1 != nil {
 		lg.Print(lg.INFO, err1.Error())
 	}
+	lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), `[`, cache.Name, `] `, "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", bbsDto.Title, "】", lg.Yellow, "正在执行讨论任务点...")
 	var report string
 	var err error
 	if user.CoursesCustom.AutoExam == 1 {
@@ -1228,7 +1229,7 @@ func examAction(userCache *xuexitongApi.XueXiTUserCache, user *config.User, sett
 		if err2 != nil {
 			log.Fatal(err2)
 		}
-		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Yellow, fmt.Sprintf("考试状态中,正在回答第%d题,总共%d题", i+1,exam.QuestionTotal))
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Yellow, fmt.Sprintf("考试状态中,正在回答第%d题,总共%d题", i+1, exam.QuestionTotal))
 		//内置AI自动写题
 		if user.CoursesCustom.AutoExam == 1 {
 			err3 := question.WriteQuestionForAIAction(userCache, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, setting.AiSetting.APIKEY)

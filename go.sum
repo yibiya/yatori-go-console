@@ -143,8 +143,8 @@ github.com/ugorji/go/codec v1.3.1 h1:waO7eEiFDwidsBN6agj1vJQ4AG7lh2yqXyOXqhgQuyY
 github.com/ugorji/go/codec v1.3.1/go.mod h1:pRBVtBSKl77K30Bv8R2P+cLSGaTtex6fsA2Wjqmfxj4=
 github.com/yalue/onnxruntime_go v1.24.0 h1:IdgJLxxyotlsUTmL1UnHZgBzXJGgY51LZ4vQ5rZeOXU=
 github.com/yalue/onnxruntime_go v1.24.0/go.mod h1:b4X26A8pekNb1ACJ58wAXgNKeUCGEAQ9dmACut9Sm/4=
-github.com/yatori-dev/yatori-go-core v1.9.1-0.20260404160744-40adaa013d68 h1:X0Wmk5zqFZs9JQVw4KowUwLh6LhZUoVmepuH5aNHCZw=
-github.com/yatori-dev/yatori-go-core v1.9.1-0.20260404160744-40adaa013d68/go.mod h1:nqgYsUW0XeAucAybHeSYEFP752ES+RGL1+xOhyN7FjM=
+github.com/yatori-dev/yatori-go-core v1.9.1-0.20260512164928-622dac5df735 h1:8JY8jhb71uMcER590Fqx09YBl/zBDjf8/+IPk3YBsKA=
+github.com/yatori-dev/yatori-go-core v1.9.1-0.20260512164928-622dac5df735/go.mod h1:nqgYsUW0XeAucAybHeSYEFP752ES+RGL1+xOhyN7FjM=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.uber.org/mock v0.6.0 h1:hyF9dfmbgIX5EfOdasqLsWD6xqpNZlXblLB/Dbnwv3Y=
 go.uber.org/mock v0.6.0/go.mod h1:KiVJ4BqZJaMj4svdfmHM0AUx4NJYO8ZNpPnZn1Z+BBU=
