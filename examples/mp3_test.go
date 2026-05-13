@@ -6,5 +6,7 @@ import (
 )
 
 func TestNotice(t *testing.T) {
+	t.Skip("manual audio example; excluded from automated test runs")
+
 	utils.PlayNoticeSound()
 }

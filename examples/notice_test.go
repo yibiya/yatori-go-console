@@ -11,6 +11,8 @@ import (
 
 // 测试拉取console公告
 func TestNoticePull(t *testing.T) {
+	t.Skip("manual network example; excluded from automated test runs")
+
 	url := "https://yatori-dev.github.io/yatori-docs/notice/yatori-go-console-inform.txt"
 	method := "GET"
 

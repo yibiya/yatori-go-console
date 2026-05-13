@@ -36,6 +36,8 @@ func C(ctx context.Context) error {
 	}
 }
 func TestChannel(t *testing.T) {
+	t.Skip("manual concurrency example; excluded from automated test runs")
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {

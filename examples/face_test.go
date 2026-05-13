@@ -7,6 +7,8 @@ import (
 )
 
 func TestFace(t *testing.T) {
+	t.Skip("manual hardware-dependent example; excluded from automated test runs")
+
 	base64, err := utils.GetFaceBase64()
 	if err != nil {
 		panic(err)
