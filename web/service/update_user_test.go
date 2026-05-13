@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"yatori-go-console/config"
 	"yatori-go-console/dao"
@@ -36,6 +37,8 @@ users:
   informEmails: []
   coursesCustom:
     studyTime: 10-30
+    autoRunStartTime: 08:00
+    autoRunEndTime: 20:00
     cxNode: 3
     cxChapterTestSw: 0
     cxWorkSw: 0
@@ -131,17 +134,19 @@ func TestUpdateUserServicePersistsCoursesCustom(t *testing.T) {
 		"remarkName":   "",
 		"informEmails": []string{},
 		"coursesCustom": map[string]any{
-			"studyTime":       "10-30",
-			"videoModel":      0,
-			"autoExam":        3,
-			"examAutoSubmit":  0,
-			"cxNode":          3,
-			"cxChapterTestSw": 0,
-			"cxWorkSw":        1,
-			"cxExamSw":        1,
-			"shuffleSw":       0,
-			"includeCourses":  []string{},
-			"excludeCourses":  []string{},
+			"studyTime":        "10-30",
+			"autoRunStartTime": "09:00",
+			"autoRunEndTime":   "22:30",
+			"videoModel":       0,
+			"autoExam":         3,
+			"examAutoSubmit":   0,
+			"cxNode":           3,
+			"cxChapterTestSw":  0,
+			"cxWorkSw":         1,
+			"cxExamSw":         1,
+			"shuffleSw":        0,
+			"includeCourses":   []string{},
+			"excludeCourses":   []string{},
 		},
 	}
 	payload, err := json.Marshal(body)
@@ -165,5 +170,73 @@ func TestUpdateUserServicePersistsCoursesCustom(t *testing.T) {
 	}
 	if localCfg.Users[0].CoursesCustom.CxWorkSw == nil || *localCfg.Users[0].CoursesCustom.CxWorkSw != 1 {
 		t.Fatalf("expected cxWorkSw=1 after UpdateUserService, got %+v", localCfg.Users[0].CoursesCustom.CxWorkSw)
+	}
+	if localCfg.Users[0].CoursesCustom.AutoRunStartTime != "09:00" || localCfg.Users[0].CoursesCustom.AutoRunEndTime != "22:30" {
+		t.Fatalf("expected auto run window 09:00-22:30, got %s-%s", localCfg.Users[0].CoursesCustom.AutoRunStartTime, localCfg.Users[0].CoursesCustom.AutoRunEndTime)
+	}
+}
+
+func TestIsWithinAutoExecutionWindow(t *testing.T) {
+	tests := []struct {
+		name    string
+		start   string
+		end     string
+		now     time.Time
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:  "within same day window",
+			start: "09:00",
+			end:   "18:00",
+			now:   time.Date(2026, 1, 1, 10, 30, 0, 0, time.Local),
+			want:  true,
+		},
+		{
+			name:  "outside same day window",
+			start: "09:00",
+			end:   "18:00",
+			now:   time.Date(2026, 1, 1, 8, 59, 0, 0, time.Local),
+			want:  false,
+		},
+		{
+			name:  "cross midnight window",
+			start: "22:00",
+			end:   "02:00",
+			now:   time.Date(2026, 1, 1, 1, 30, 0, 0, time.Local),
+			want:  true,
+		},
+		{
+			name:  "same time means full day",
+			start: "00:00",
+			end:   "00:00",
+			now:   time.Date(2026, 1, 1, 15, 0, 0, 0, time.Local),
+			want:  true,
+		},
+		{
+			name:    "missing end time invalid",
+			start:   "09:00",
+			end:     "",
+			now:     time.Date(2026, 1, 1, 10, 0, 0, 0, time.Local),
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := isWithinAutoExecutionWindow(tc.start, tc.end, tc.now)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+		})
 	}
 }

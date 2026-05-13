@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"yatori-go-console/dao"
 	"yatori-go-console/global"
+	"yatori-go-console/web/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,7 @@ func ServiceInit() {
 		panic(err)
 	}
 	global.GlobalDB = dbInit
+	service.StartAutoExecutionScheduler()
 
 	serverInit().Run(":8080")
 }

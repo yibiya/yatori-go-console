@@ -13,7 +13,6 @@ const apiClient = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
-    // 可以在这里添加认证信息，如token
     return config
   },
   (error) => {

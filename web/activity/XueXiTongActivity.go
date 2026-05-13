@@ -58,6 +58,9 @@ func (activity *XXTActivity) Start() error {
 		}
 	}
 	activity.IsRunning = true
+	defer func() {
+		activity.IsRunning = false
+	}()
 	return activity.userBlock() //开刷
 }
 
@@ -128,10 +131,12 @@ func (activity *XXTActivity) userBlock() error {
 
 func (activity *XXTActivity) nodeListStudy(setting config.Setting, user *config.User, userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse) {
 	//过滤课程---------------------------------
-	if len(user.CoursesCustom.IncludeCourses) != 0 && !config.CmpCourse(courseItem.CourseName, user.CoursesCustom.IncludeCourses) {
+	//排除指定课程
+	if len(user.CoursesCustom.ExcludeCourses) != 0 && config.CmpCourse(courseItem.CourseName, user.CoursesCustom.ExcludeCourses) {
 		return
 	}
-	if len(user.CoursesCustom.ExcludeCourses) != 0 && config.CmpCourse(courseItem.CourseName, user.CoursesCustom.ExcludeCourses) {
+	//包含指定课程
+	if len(user.CoursesCustom.IncludeCourses) != 0 && !config.CmpCourse(courseItem.CourseName, user.CoursesCustom.IncludeCourses) {
 		return
 	}
 
