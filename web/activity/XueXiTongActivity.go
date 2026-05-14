@@ -657,6 +657,8 @@ func (activity *XXTActivity) WriteCourseWorkAndExam(setting config.Setting, user
 						continue
 					}
 					//进入作业
+					lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Yellow, "正在尝试进入作业...")
+					time.Sleep(3 * time.Second)
 					err2 := xuexitong.EnterWorkAction(userCache, &work)
 					if err2 != nil {
 						if strings.Contains(err2.Error(), "已过时效，不能操作!") {
@@ -731,7 +733,11 @@ func (activity *XXTActivity) WorkAction(userCache *xuexitongApi.XueXiTUserCache,
 			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "作业提交失败:"+err3.Error())
 		}
 
-		lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+		if gojsonq.New().JSONString(submitResult).Find("status") == false {
+			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, fmt.Sprintf("第%d题回答失败,服务器返回:%s", i+1, submitResult))
+		} else {
+			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+		}
 	}
 	lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, "作业已完成")
 }
@@ -789,7 +795,12 @@ func (activity *XXTActivity) ExamAction(userCache *xuexitongApi.XueXiTUserCache,
 			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "试卷提交失败，考试时间已用完，已自动跳过。服务器返回信息:"+submitResult)
 			break
 		}
-		lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+
+		if gojsonq.New().JSONString(submitResult).Find("status") == false {
+			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, fmt.Sprintf("第%d题回答失败,服务器返回:%s", i+1, submitResult))
+		} else {
+			lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+		}
 	}
 	lg.Print(lg.INFO, "[学习通]", "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, "考试已完成")
 }
