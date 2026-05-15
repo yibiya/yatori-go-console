@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Save, Bot } from "lucide-react"
+import { getSystemConfig, updateSystemConfig, SystemConfig } from "@/api/systemApi"
+import { useToast } from "@/hooks/use-toast"
 
 export type AIConfig = {
   provider: string
@@ -16,6 +18,8 @@ export type AIConfig = {
 }
 
 export function AIConfigForm() {
+  const { toast } = useToast()
+  const [fullConfig, setFullConfig] = useState<SystemConfig | null>(null)
   const [config, setConfig] = useState<AIConfig>({
     provider: "",
     model: "",
@@ -25,22 +29,115 @@ export function AIConfigForm() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [isBankSaved, setIsBankSaved] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const handleSave = () => {
-    console.log("Saving AI config:", config)
-    setIsSaved(true)
-    setTimeout(() => setIsSaved(false), 2000)
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await getSystemConfig()
+        if (response.code === 200) {
+          setFullConfig(response.data)
+          const ai = response.data.aiSetting
+          setConfig({
+            provider: ai.aiType === "TONGYI" ? "tongyi" : ai.aiType === "DEEPSEEK" ? "deepseek" : "",
+            model: ai.model || "",
+            apiKey: ai.API_KEY || "",
+          })
+          setExternalBankUrl(response.data.apiQueSetting.url || "")
+        }
+      } catch (error) {
+        console.error("Failed to load config:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadConfig()
+  }, [])
+
+  const handleSave = async () => {
+    if (!fullConfig) return
+    
+    const updatedConfig: SystemConfig = {
+      ...fullConfig,
+      aiSetting: {
+        ...fullConfig.aiSetting,
+        aiType: config.provider === "tongyi" ? "TONGYI" : config.provider === "deepseek" ? "DEEPSEEK" : "",
+        model: config.model,
+        API_KEY: config.apiKey,
+        aiUrl: config.provider === "tongyi" ? "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" : 
+               config.provider === "deepseek" ? "https://api.deepseek.com/chat/completions" : ""
+      }
+    }
+
+    try {
+      const response = await updateSystemConfig(updatedConfig)
+      if (response.code === 200) {
+        setFullConfig(updatedConfig)
+        setIsSaved(true)
+        toast({
+          title: "配置已保存",
+          description: "AI模型配置已更新",
+        })
+        setTimeout(() => setIsSaved(false), 2000)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "保存失败",
+          description: response.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "保存出错",
+        description: "请检查网络或后端状态",
+      })
+    }
   }
 
-  const handleSaveBank = () => {
-    if (!externalBankUrl) return
-    console.log("Saving external bank config:", { externalBankUrl })
-    setIsBankSaved(true)
-    setTimeout(() => setIsBankSaved(false), 2000)
+  const handleSaveBank = async () => {
+    if (!fullConfig || !externalBankUrl) return
+    
+    const updatedConfig: SystemConfig = {
+      ...fullConfig,
+      apiQueSetting: {
+        ...fullConfig.apiQueSetting,
+        url: externalBankUrl
+      }
+    }
+
+    try {
+      const response = await updateSystemConfig(updatedConfig)
+      if (response.code === 200) {
+        setFullConfig(updatedConfig)
+        setIsBankSaved(true)
+        toast({
+          title: "配置已保存",
+          description: "外部题库配置已更新",
+        })
+        setTimeout(() => setIsBankSaved(false), 2000)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "保存失败",
+          description: response.message,
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "保存出错",
+        description: "请检查网络或后端状态",
+      })
+    }
   }
 
   const isFormValid = config.provider && config.model && config.apiKey
   const isBankFormValid = externalBankUrl
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64 text-muted-foreground">加载配置中...</div>
+  }
 
   return (
     <motion.div

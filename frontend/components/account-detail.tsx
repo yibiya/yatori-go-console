@@ -15,7 +15,7 @@ import {Switch} from "@/components/ui/switch"
 import {Textarea} from "@/components/ui/textarea"
 import {toast} from "@/components/ui/use-toast"
 import {getCourseList} from "@/api/courseApi"
-import {getAccountDetail, getAccountLogs, startBrushForUid, stopBrushForUid, updateAccount} from "@/api/accountApi"
+import {getAccountDetail, getAccountLogs, startBrushForUid, stopBrushForUid, updateAccount, clearLogs} from "@/api/accountApi"
 import {getPlatformName} from "@/utils/platformUtils"
 import type {Account, Course} from "@/components/account-list"
 
@@ -470,6 +470,32 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
         }
     }
 
+    const handleClearLogs = async () => {
+        try {
+            const response = await clearLogs()
+            if (response.code === 200) {
+                setLogs("")
+                toast({
+                    title: "清空成功",
+                    description: "所有账号日志已从服务器清空",
+                })
+                return
+            }
+            toast({
+                title: "清空失败",
+                description: response.message,
+                variant: "destructive",
+            })
+        } catch (error) {
+            console.error("清空日志失败:", error)
+            toast({
+                title: "操作失败",
+                description: "无法连接到服务器，请稍后重试",
+                variant: "destructive",
+            })
+        }
+    }
+
     const updateForm = (field: keyof EditableForm, value: string) => {
         setForm((prev) => ({...prev, [field]: value}))
     }
@@ -489,7 +515,7 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
     const currentCxNodeLabel = getOptionLabel(cxNodeOptions, form.cxNode, "默认 3 个节点")
 
     return (
-        <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} transition={{duration: 0.4}} className="space-y-6">
+        <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} transition={{duration: 0.4}} className="w-full max-w-full overflow-x-hidden space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <Button variant="ghost" onClick={onBack} className="w-fit gap-2 text-sm sm:text-base">
                     <ArrowLeft className="h-4 w-4"/>
@@ -924,13 +950,21 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                 </TabsContent>
 
                 <TabsContent value="logs" className="mt-0">
-                    <Card className="border-0 shadow-sm">
+                    <Card className="w-full overflow-hidden border-0 shadow-sm">
                         <CardHeader className="border-b bg-muted/20">
-                            <h3 className="text-lg font-semibold">账号日志</h3>
-                            <p className="text-sm text-muted-foreground">当前按账号关键字过滤日志，每 5 秒自动刷新一次。</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold">账号日志</h3>
+                                    <p className="text-sm text-muted-foreground">当前按账号关键字过滤日志，每 5 秒自动刷新一次。</p>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={handleClearLogs} className="gap-2 text-destructive hover:bg-destructive/5 hover:text-destructive">
+                                    <Trash2 className="h-4 w-4"/>
+                                    清空所有日志
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap break-words bg-slate-950/95 p-5 font-mono text-xs leading-6 text-slate-100">
+                            <pre className="max-h-[34rem] w-full min-w-0 overflow-auto whitespace-pre-wrap break-all bg-slate-950/95 p-5 font-mono text-xs leading-6 text-slate-100">
                                 {isLoadingLogs ? "日志加载中..." : logs || "暂无该账号相关日志"}
                             </pre>
                         </CardContent>

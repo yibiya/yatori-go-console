@@ -68,6 +68,21 @@ func (UserApi) StopBrushController(c *gin.Context) {
 	service.StopBrushService(c)
 }
 
+// 清空日志
+func (UserApi) ClearLogsController(c *gin.Context) {
+	service.ClearLogsService(c)
+}
+
+// 获取全局设置
+func (UserApi) GetGlobalSettingController(c *gin.Context) {
+	service.GetGlobalSettingService(c)
+}
+
+// 更新全局设置
+func (UserApi) UpdateGlobalSettingController(c *gin.Context) {
+	service.UpdateGlobalSettingService(c)
+}
+
 // 日志同步接口
 func (UserApi) StreamLog(c *gin.Context) {
 	logID := c.Param("id")

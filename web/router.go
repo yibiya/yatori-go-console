@@ -17,6 +17,9 @@ func (router Group) ApiV1Router() {
 	router.GET("/v1/getAccountLogs/:uid", userApi.AccountLogsController)              //获取账号日志
 	router.GET("/v1/startBrush/:uid", userApi.StartBrushController)                   //启动刷课
 	router.GET("/v1/stopBrush/:uid", userApi.StopBrushController)                     //停止刷课
+	router.POST("/v1/clearLogs", userApi.ClearLogsController)                         //清空日志
+	router.GET("/v1/getGlobalSetting", userApi.GetGlobalSettingController)             //获取全局设置
+	router.POST("/v1/updateGlobalSetting", userApi.UpdateGlobalSettingController)       //更新全局设置
 
 	router.GET("/v1/streamLog/:id", userApi.StreamLog) //推送日志
 }

@@ -1,11 +1,11 @@
 package service
 
 import (
-	"bufio"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,9 +16,12 @@ import (
 	"yatori-go-console/dao"
 	"yatori-go-console/entity/dto"
 	"yatori-go-console/entity/pojo"
+	"yatori-go-console/entity/vo"
 	"yatori-go-console/global"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	lg "github.com/yatori-dev/yatori-go-core/utils/log"
 	"golang.org/x/crypto/scrypt"
 	"gopkg.in/yaml.v3"
 )
@@ -378,29 +381,34 @@ func getLocalConfigUserLogs(uid string, limit int) (map[string]any, error) {
 		maxScanLines = 1000
 	}
 
-	account := strings.TrimSpace(user.Account)
-	maskedAccount := maskAccountString(account)
-	buffer := make([]string, 0, maxScanLines)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text() + "\n"
-		if len(buffer) >= maxScanLines {
-			copy(buffer, buffer[1:])
-			buffer[len(buffer)-1] = line
-		} else {
-			buffer = append(buffer, line)
-		}
-	}
-	if err := scanner.Err(); err != nil {
+	contentBytes, err := os.ReadFile(activeLogFile)
+	if err != nil {
 		return nil, err
 	}
 
+	// 清理 null bytes 并转换为字符串
+	rawContent := strings.ReplaceAll(string(contentBytes), "\x00", "")
+	allLines := strings.Split(rawContent, "\n")
+
+	// 提取匹配账号的日志
+	account := strings.TrimSpace(user.Account)
+	maskedAccount := maskAccountString(account)
 	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	phonePattern := regexp.MustCompile(`(1[3-9]\d)\d{4}(\d{4})`)
 	ignoredKeywords := []string{"Request Body:", "SELECT * FROM `user_pos`", "rows:", "[GIN]"}
 
 	matched := make([]string, 0, limit)
-	for _, line := range buffer {
+	// 只处理最后的 maxScanLines 行，提高效率
+	start := 0
+	if len(allLines) > maxScanLines {
+		start = len(allLines) - maxScanLines
+	}
+
+	for i := start; i < len(allLines); i++ {
+		line := allLines[i]
+		if line == "" {
+			continue
+		}
 		if account != "" && strings.Contains(line, account) || maskedAccount != "" && strings.Contains(line, maskedAccount) {
 			cleaned := ansiPattern.ReplaceAllString(line, "")
 			ignored := false
@@ -413,14 +421,17 @@ func getLocalConfigUserLogs(uid string, limit int) (map[string]any, error) {
 			if ignored {
 				continue
 			}
-			matched = append(matched, cleaned)
+			matched = append(matched, cleaned+"\n")
 		}
 	}
+
 	if len(matched) > limit {
 		matched = matched[len(matched)-limit:]
 	}
 
 	content := phonePattern.ReplaceAllString(strings.Join(matched, ""), "${1}****${2}")
+	content = strings.TrimLeft(content, " \n\r\t")
+
 	return map[string]any{
 		"success": true,
 		"uid":     uid,
@@ -441,6 +452,96 @@ func maskAccountString(account string) string {
 		return "***@" + parts[1]
 	}
 	return account
+}
+
+func clearLocalConfigLogs() error {
+	localConfigMu.Lock()
+	defer localConfigMu.Unlock()
+
+	cfg, err := loadLocalConfig()
+	if err != nil {
+		return err
+	}
+
+	assetsLogDir := "./assets/log"
+	files, _ := filepath.Glob(filepath.Join(assetsLogDir, "log*.txt"))
+
+	for _, f := range files {
+		_ = os.Remove(f)
+	}
+
+	// 同时也尝试清理配置的日志目录
+	logDir := getLogDirPath()
+	if logDir != "" && logDir != "." {
+		_ = os.Remove(filepath.Join(logDir, "console_server.log"))
+		_ = os.Remove(filepath.Join(logDir, "yatori_core.log"))
+	}
+
+	// 重新初始化日志，强制 logger 关闭旧句柄并创建新文件，防止产生文件空洞（null bytes）
+	lg.LogInit(lg.StringToLOGLEVEL(cfg.Setting.BasicSetting.LogLevel),
+		cfg.Setting.BasicSetting.LogOutFileSw == 1,
+		cfg.Setting.BasicSetting.ColorLog,
+		"./assets/log")
+
+	return nil
+}
+
+func GetGlobalSettingService(c *gin.Context) {
+	localConfigMu.Lock()
+	defer localConfigMu.Unlock()
+
+	cfg, err := loadLocalConfig()
+	if err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, vo.Response{
+		Code:    200,
+		Message: "获取配置成功",
+		Data:    cfg.Setting,
+	})
+}
+
+func UpdateGlobalSettingService(c *gin.Context) {
+	localConfigMu.Lock()
+	defer localConfigMu.Unlock()
+
+	var setting config.Setting
+	if err := c.ShouldBindJSON(&setting); err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	cfg, err := loadLocalConfig()
+	if err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	cfg.Setting = setting
+	if err := saveLocalConfig(cfg); err != nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, vo.Response{
+		Code:    200,
+		Message: "更新配置成功",
+		Data:    cfg.Setting,
+	})
 }
 
 func syncUsersFromConfigManager() ([]pojo.UserPO, error) {

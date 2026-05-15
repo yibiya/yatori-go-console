@@ -183,10 +183,21 @@ export const stopBrushForUid = async (uid: string): Promise<StopBrushForUidRespo
         // 统一使用类型断言保持一致性
         return await apiClient.get(`/v1/stopBrush/${uid}`) as StopBrushForUidResponse;
     } catch (error: any) {
-        console.error('Error in deleteAccount:', error)
+        console.error('Error in stopBrush:', error)
         return {
             code: 500,
-            message: error.response?.data?.message || '删除账号失败'
+            message: error.response?.data?.message || '停止刷课失败'
         }
     }
+}
+// 清空日志
+export const clearLogs = async (): Promise<{ code: number; message: string }> => {
+  try {
+    return await apiClient.post('/v1/clearLogs') as { code: number; message: string }
+  } catch (error: any) {
+    return {
+      code: 500,
+      message: error.response?.data?.message || '清空日志失败'
+    }
+  }
 }
