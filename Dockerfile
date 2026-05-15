@@ -9,7 +9,8 @@ RUN npm install -g pnpm
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 
 # 安装依赖
-RUN pnpm install --frozen-lockfile
+RUN pnpm config set only-allow-scripts-list "@parcel/watcher,esbuild,sharp,vue-demi" && \
+    pnpm install --frozen-lockfile
 
 # 复制源码并构建
 COPY frontend/ ./
