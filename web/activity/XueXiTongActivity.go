@@ -382,7 +382,7 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 			if !workDTO.IsJob {
 				continue
 			}
-			questionAction, err := xuexitong.ChapterTestListAction(userCache, &workDTO)
+			questionAction, err := xuexitong.ParseWorkQuestionAction(userCache, &workDTO)
 			if err != nil {
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Red, "拉取章节作业失败:", err.Error())
 				continue
