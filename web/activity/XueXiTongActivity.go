@@ -387,7 +387,7 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Red, "拉取章节作业失败:", err.Error())
 				continue
 			}
-			activity.chapterTestAction(userCache, courseItem, pointAction.Knowledge[index], *questionAction, setting)
+			activity.chapterTestAction(userCache, courseItem, pointAction.Knowledge[index], questionAction, setting)
 			time.Sleep(5 * time.Second)
 		}
 	}
@@ -844,12 +844,6 @@ func (activity *XXTActivity) chapterTestAction(userCache *xuexitongApi.XueXiTUse
 			q.AnswerXXTAIGet(userCache, questionAction.ClassId, questionAction.CourseId, questionAction.Cpi, message)
 		}
 		time.Sleep(time.Duration(rand.Intn(stopEnd-stopStart)+stopStart) * time.Second)
-	}
-	err3 := questionAction.SubmitChapterTest(userCache)
-	if err3 != nil {
-		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Red, "章节作业提交失败:", err3.Error())
-	} else {
-		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Green, "章节作业已完成")
 	}
 }
 
