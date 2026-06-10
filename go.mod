@@ -1,6 +1,6 @@
 module yatori-go-console
 
-go 1.24.11
+go 1.24.0
 
 // 若出现hash校验错误请使用以下指令
 // set GONOSUMDB=*

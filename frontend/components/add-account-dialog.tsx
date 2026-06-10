@@ -19,6 +19,7 @@ import type { Account } from "@/components/account-list"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { addAccount as apiAddAccount } from "@/api/accountApi"
 import { toast } from "@/components/ui/use-toast"
+import { PLATFORM_OPTIONS } from "@/utils/platformUtils"
 
 type AddAccountDialogProps = {
     open: boolean
@@ -139,8 +140,11 @@ export function AddAccountDialog({ open, onOpenChange, onAdd }: AddAccountDialog
                                     <SelectValue placeholder="请选择账号平台" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="XUEXITONG">学习通</SelectItem>
-                                    <SelectItem value="YINGHUA">英华学堂</SelectItem>
+                                    {PLATFORM_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

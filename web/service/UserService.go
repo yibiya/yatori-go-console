@@ -396,6 +396,24 @@ func UpdateUserService(c *gin.Context) {
 		})
 		return
 	}
+
+	// 热重载配置到正在运行的 Activity
+	if userPO, _ := dao.QueryUser(global.GlobalDB, pojo.UserPO{Uid: req.Uid}); userPO != nil {
+		if act := global.GetUserActivity(*userPO); act != nil {
+			// 用更新后的配置覆盖 Activity 内部的 config.User
+			(*act).SetUser(config.User{
+				AccountType:   req.AccountType,
+				URL:           req.URL,
+				RemarkName:    req.RemarkName,
+				Account:       req.Account,
+				Password:      req.Password,
+				IsProxy:       req.IsProxy,
+				InformEmails:  req.InformEmails,
+				CoursesCustom: req.CoursesCustom,
+			})
+		}
+	}
+
 	if err := syncAutoExecutionSchedules(time.Now()); err != nil {
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    500,
