@@ -3,7 +3,6 @@ package yinghua
 import (
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"sync"
@@ -383,7 +382,7 @@ func workAction(setting config.Setting, user *config.User, userCache *yinghuaApi
 		err := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType)
 		if err != nil {
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, fmt.Sprintf("<%s>", setting.AiSetting.AiType), "AI不可用，错误信息："+err.Error())
-			os.Exit(0)
+			return
 		}
 	}
 
@@ -391,7 +390,7 @@ func workAction(setting config.Setting, user *config.User, userCache *yinghuaApi
 		err := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 3, nil)
 		if err != nil {
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "外置题库不可用，错误信息："+err.Error())
-			os.Exit(0)
+			return
 		}
 	}
 	//获取作业详细信息
@@ -460,7 +459,7 @@ func examAction(setting config.Setting, user *config.User, userCache *yinghuaApi
 		err := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType)
 		if err != nil {
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, fmt.Sprintf("<%s>", setting.AiSetting.AiType), "AI不可用，错误信息："+err.Error())
-			os.Exit(0)
+			return
 		}
 	}
 
@@ -468,7 +467,7 @@ func examAction(setting config.Setting, user *config.User, userCache *yinghuaApi
 		err := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 3, nil)
 		if err != nil {
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "外置题库不可用，错误信息："+err.Error())
-			os.Exit(0)
+			return
 		}
 	}
 

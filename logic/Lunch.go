@@ -249,7 +249,7 @@ func configJsonCheck(configData *config.JSONDataForConfig) {
 			return
 		}
 		lg.Print(lg.INFO, lg.BoldRed, "请先在config文件中配置好相应账号")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	//防止用户填完整url
@@ -257,8 +257,8 @@ func configJsonCheck(configData *config.JSONDataForConfig) {
 
 		if v.AccountType == "YINGHUA" || v.AccountType == "HQKJ" {
 			if !strings.HasPrefix(v.URL, "http") {
-				lg.Print(lg.INFO, lg.BoldRed, "账号", v.Account, "未配置正确url，请先在config文件中配置好相应账号信息")
-				os.Exit(0)
+				lg.Print(lg.INFO, lg.BoldRed, "账号", v.Account, "未配置正确url，已跳过该账号")
+				continue
 			}
 			split := strings.Split(v.URL, "/")
 			(*configData).Users[i].URL = split[0] + "/" + split[1] + "/" + split[2]
@@ -280,8 +280,8 @@ func checkProxyIp() {
 	lg.Print(lg.INFO, lg.Yellow, "正在检查IP池IP可用性...")
 	reader, err := utils2.IpFilesReader("./ip.txt")
 	if err != nil {
-		lg.Print(lg.INFO, lg.BoldRed, "IP代理池文件ip.txt读取失败，请确认文件格式或者内容是否正确")
-		os.Exit(0)
+		lg.Print(lg.INFO, lg.BoldRed, "IP代理池文件ip.txt读取失败，已关闭IP代理功能")
+		return
 	}
 	for _, v := range reader {
 		_, state, err := utils2.CheckProxyIp(v)
@@ -295,7 +295,6 @@ func checkProxyIp() {
 	lg.Print(lg.INFO, lg.BoldGreen, "IP检查完毕")
 	//若无可用IP代理则直接退出
 	if len(utils2.IPProxyPool) == 0 {
-		lg.Print(lg.INFO, lg.BoldRed, "无可用IP代理池，若要继续使用请先检查IP代理池文件内的IP可用性，或者在配置文件关闭IP代理功能")
-		os.Exit(0)
+		lg.Print(lg.INFO, lg.BoldRed, "无可用IP代理池，已关闭IP代理功能")
 	}
 }

@@ -88,7 +88,7 @@ func AddUserService(c *gin.Context) {
 		URL:          req.Url,
 		Account:      req.Account,
 		Password:     req.Password,
-		IsProxy:      0,
+		IsProxy:      req.IsProxy,
 		InformEmails: []string{},
 		CoursesCustom: config.CoursesCustom{
 			IncludeCourses:  []string{},
@@ -178,6 +178,12 @@ func DeleteUserService(c *gin.Context) {
 				break
 			}
 		}
+	} else {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: "请提供 UID 或账号信息",
+		})
+		return
 	}
 
 	if _, err := syncUsersFromConfigManager(); err != nil {
@@ -219,7 +225,28 @@ func AccountLoginCheckService(c *gin.Context) {
 				})
 			return
 		}
-		//登录逻辑......
+		// 构建 Activity 并执行实际登录
+		createActivity := activity.BuildUserActivity(*user)
+		if createActivity == nil {
+			c.JSON(http.StatusOK, vo.Response{
+				Code:    400,
+				Message: "当前账号类型暂不支持登录检测",
+			})
+			return
+		}
+		if err := createActivity.Login(); err != nil {
+			c.JSON(http.StatusOK, vo.Response{
+				Code:    400,
+				Message: "账号登录失败: " + err.Error(),
+			})
+			return
+		}
+	} else {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: "请提供 UID 或账号信息",
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, vo.Response{
@@ -423,13 +450,18 @@ func AccountCourseListService(c *gin.Context) {
 				Instructor: course.CourseTeacher,
 			})
 		}
-		//fmt.Println(list)
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    200,
 			Message: "拉取信息成功",
 			Data:    gin.H{"courseList": courseList},
 		})
+		return
 	}
+	// 非学习通平台暂不支持拉取课程列表
+	c.JSON(http.StatusOK, vo.Response{
+		Code:    400,
+		Message: "当前平台暂不支持拉取课程列表",
+	})
 
 }
 
@@ -486,7 +518,8 @@ func StopBrushService(c *gin.Context) {
 	}
 	userActivity := global.GetUserActivity(*user)
 	if userActivity == nil {
-		c.JSON(400, gin.H{})
+		c.JSON(400, gin.H{"code": 400, "msg": "用户活动不存在"})
+		return
 	}
 	// 根据账号类型断言为具体活动类型并设置IsRunning
 	if xxt, ok := (*userActivity).(*activity.XXTActivity); ok {

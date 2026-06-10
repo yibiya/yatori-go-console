@@ -3,7 +3,6 @@ package enaea
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"sync"
 	time2 "time"
@@ -51,7 +50,8 @@ func UserLoginOperation(users []config.User) []*enaeaApi.EnaeaUserCache {
 			_, err := enaea.EnaeaLoginAction(cache) // 登录
 			if err != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Account, lg.White, "] ", lg.Red, err.Error())
-				log.Fatal(err) //登录失败则直接退出
+				log.Print(err) //登录失败则跳过该账号
+				continue
 			}
 			UserCaches = append(UserCaches, cache)
 		}
@@ -93,7 +93,7 @@ func userBlock(setting config.Setting, user *config.User, cache *enaeaApi.EnaeaU
 		courseList, err := enaea.CourseListAction(cache, course.CircleId)
 		if err != nil {
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Account, lg.Default, "] ", lg.BoldRed, "拉取项目列表错误", err.Error())
-			os.Exit(0)
+			return
 		}
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Account, lg.Default, "] ", lg.Purple, "正在学习项目", " 【"+course.ClusterName+"】 ")
 

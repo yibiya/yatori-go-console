@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,10 +88,10 @@ func UserBlock(setting config.Setting, user *config.User, cache *xuexitongApi.Xu
 	// list, err := xuexitong.XueXiTCourseDetailForCourseIdAction(cache, "261619055656961")
 	courseList, err := xuexitong.XueXiTPullCourseAction(cache)
 	if err != nil {
-		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Name, lg.Default, "] ", lg.Red, "拉取课程失败")
-		log.Fatal(err)
-	}
-	//如果是多节点模式
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+		return
+		}
+		_, err := videoDTO.AttachmentsDetection(card)
 	if user.CoursesCustom.VideoModel == 3 {
 		num := 3
 		if *user.CoursesCustom.CxNode != 0 { //根据设置自由定义同时任务点数量
@@ -162,10 +160,10 @@ func courseStudy(setting config.Setting, user *config.User, userCache *xuexitong
 	}
 	//如果课程还未开课则直接退出
 	if !courseItem.IsStart {
-		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Blue, "该课程还未开课，已自动跳过该课程")
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 		return
-	}
-
+		}
+		_, err := videoDTO.AttachmentsDetection(card)
 	//课程章节学习
 	chapterStudy(setting, user, userCache, courseItem)
 	//写课程的作业和考试
@@ -180,13 +178,13 @@ func writeCourseWorkAndExam(setting config.Setting, user *config.User, userCache
 			err2 := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "<"+setting.AiSetting.AiType+">", "AI不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		} else if user.CoursesCustom.AutoExam == 2 { // 检测外挂题库可用性
 			err2 := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 5, nil)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "外挂题库不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		}
 		if *user.CoursesCustom.CxWorkSw == 1 {
@@ -205,10 +203,10 @@ func writeCourseWorkAndExam(setting config.Setting, user *config.User, userCache
 					err2 := xuexitong.EnterWorkAction(userCache, &work)
 					if err2 != nil {
 						if strings.Contains(err2.Error(), "已过时效，不能操作!") {
-							lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "该作业已过时，已自动跳过该作业...")
-							continue
-						}
-						log.Fatal(err2)
+							lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+							return
+							}
+							_, err := videoDTO.AttachmentsDetection(card)
 					}
 					//执行作业
 					workAction(userCache, user, setting, courseItem, work)
@@ -254,10 +252,10 @@ func chapterStudy(setting config.Setting, user *config.User, userCache *xuexiton
 
 		if err != nil {
 			if strings.Contains(err.Error(), "课程章节为空") {
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该课程章节为空已自动跳过")
+				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 				return
-			}
-			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "拉取章节信息接口访问异常，若需要继续可以配置中添加排除此异常课程。返回信息：", err.Error())
+				}
+				_, err := videoDTO.AttachmentsDetection(card)
 			return
 			//log.Fatal()
 		}
@@ -286,10 +284,10 @@ func chapterStudy(setting config.Setting, user *config.User, userCache *xuexiton
 				//如果是0任务点，则直接浏览一遍主页面即可完成任务，不必继续下去
 				err2 := xuexitong.EnterChapterForwardCallAction(userCache, strconv.Itoa(courseId), strconv.Itoa(key), strconv.Itoa(pointAction.Knowledge[index].ID), strconv.Itoa(courseItem.Cpi))
 				if err2 != nil {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "零任务点遍历失败。返回信息：", err2.Error())
-				}
-			}
-			return i.PointTotal >= 0 && i.PointTotal == i.PointFinished
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
 		}
 
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Purple, "正在学习该课程")
@@ -339,10 +337,10 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 	pointAction xuexitong.ChaptersList, action xuexitong.ChaptersList, nodes []int, index int, key int, courseId int) {
 	_, fetchCards, err1 := xuexitong.ChapterFetchCardsAction(userCache, &action, nodes, index, courseId, key, courseItem.Cpi)
 	if err1 != nil {
-		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "无法正常拉取卡片信息，请联系作者查明情况,报错信息：", err1.Error())
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 		return
-	}
-
+		}
+		_, err := videoDTO.AttachmentsDetection(card)
 	videoDTOs, workDTOs, documentDTOs, hyperlinkDTOs, liveDTOs, bbsDTOs := xuexitongApi.ParsePointDto(fetchCards)
 	if videoDTOs == nil && workDTOs == nil && documentDTOs == nil && hyperlinkDTOs == nil && liveDTOs == nil && bbsDTOs == nil {
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Blue, "课程对应章节无任何任务节点，已自动跳过")
@@ -355,21 +353,21 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 				userCache, key, courseId, videoDTO.KnowledgeID, videoDTO.CardIndex, courseItem.Cpi)
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
-					break
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				if strings.Contains(err2.Error(), "活体检测失败") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号所录入的人脸可能并不规范，请自行拍摄人脸放到assets/face/账号名称.jpg路径下再重试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-			videoDTO.AttachmentsDetection(card)
+				_, err := videoDTO.AttachmentsDetection(card)
 
 			if !videoDTO.IsJob {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Blue, "该视屏或音频非任务点或已完成，已自动跳过")
@@ -398,17 +396,17 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 				userCache, key, courseId, documentDTO.KnowledgeID, documentDTO.CardIndex, courseItem.Cpi)
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
-					break
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-			documentDTO.AttachmentsDetection(card)
+				_, err := videoDTO.AttachmentsDetection(card)
 			//如果不是任务或者说该任务已完成，那么直接跳过
 			if !documentDTO.IsJob {
 				continue
@@ -425,13 +423,13 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 			err2 := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "<"+setting.AiSetting.AiType+">", "AI不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		} else if user.CoursesCustom.AutoExam == 2 { // 检测外挂题库可用性
 			err2 := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 5, nil)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "外挂题库不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		}
 
@@ -441,17 +439,17 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
-					continue
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-			flag, _ := workDTO.AttachmentsDetection(mobileCard)
+				_, err := videoDTO.AttachmentsDetection(card)
 			questionAction, err2 := xuexitong.ParseWorkQuestionAction(userCache, &workDTO)
 			if err2 != nil && strings.Contains(err2.Error(), "已截止，不能作答") {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", questionAction.Title, "】", lg.Yellow, "该试卷已到截止时间，已自动跳过")
@@ -482,17 +480,17 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
-					continue
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-			hyperlinkDTO.AttachmentsDetection(card)
+				_, err := videoDTO.AttachmentsDetection(card)
 
 			ExecuteHyperlink(user, userCache, courseItem, pointAction.Knowledge[index], &hyperlinkDTO)
 			time.Sleep(5 * time.Second)
@@ -506,17 +504,17 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
-					continue
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-			liveDTO.AttachmentsDetection(card)
+				_, err := videoDTO.AttachmentsDetection(card)
 			if !liveDTO.IsJob { //不是任务点或者已经是完成的任务点直接退出
 				continue
 			}
@@ -531,13 +529,13 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 			err2 := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "<"+setting.AiSetting.AiType+">", "AI不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		} else if user.CoursesCustom.AutoExam == 2 { // 检测外挂题库可用性
 			err2 := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 5, nil)
 			if err2 != nil {
 				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), lg.BoldRed, "外挂题库不可用，错误信息："+err2.Error())
-				os.Exit(0)
+				return
 			}
 		}
 		for _, bbsDTO := range bbsDTOs {
@@ -545,17 +543,17 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 				userCache, key, courseId, bbsDTO.KnowledgeID, bbsDTO.CardIndex, courseItem.Cpi)
 			if err2 != nil {
 				if strings.Contains(err2.Error(), "章节未开放") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+					return
+					}
+					_, err := videoDTO.AttachmentsDetection(card)
+				return
 				}
-				if strings.Contains(err2.Error(), "没有历史人脸") {
-					lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
-				}
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
-			}
-
+				_, err := videoDTO.AttachmentsDetection(card)
 			bbsDTO.AttachmentsDetection(card)
 			if !bbsDTO.IsJob { //不是任务点或者已经是完成的任务点直接退出
 				continue
@@ -668,10 +666,10 @@ func ExecuteVideo(user *config.User, cache *xuexitongApi.XueXiTUserCache, course
 					pullJson, img, err2 := cache.GetHistoryFaceImg("")
 					if err2 != nil {
 						lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", p.Title, "】 >>> ", lg.BoldRed, "上传人脸失败，已自动跳过该视屏", pullJson, err2)
+						lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 						return
-						//os.Exit(0)
-					}
-					disturbImage := utils.ImageRGBDisturb(img)
+						}
+						_, err := videoDTO.AttachmentsDetection(card)
 					//uuid,qrEnc,ObjectId,successEnc
 					_, _, _, _, errPass := xuexitong.PassFacePCAction(cache, p.CourseID, p.ClassID, p.Cpi, fmt.Sprintf("%d", p.KnowledgeID), p.Enc, p.JobID, p.ObjectID, p.Mid, p.RandomCaptureTime, disturbImage)
 					if errPass != nil {
@@ -793,10 +791,10 @@ func ExecuteAudio(user *config.User, cache *xuexitongApi.XueXiTUserCache, course
 					pullJson, img, err2 := cache.GetHistoryFaceImg("")
 					if err2 != nil {
 						lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, cache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", p.Title, "】 >>> ", lg.BoldRed, "上传人脸失败，已自动跳过该音频", pullJson, err2)
+						lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
 						return
-						//os.Exit(0)
-					}
-					disturbImage := utils.ImageRGBDisturb(img)
+						}
+						_, err := videoDTO.AttachmentsDetection(card)
 					//uuid,qrEnc,ObjectId,successEnc
 					_, _, _, _, errPass := xuexitong.PassFacePCAction(cache, p.CourseID, p.ClassID, p.Cpi, fmt.Sprintf("%d", p.KnowledgeID), p.Enc, p.JobID, p.ObjectID, p.Mid, p.RandomCaptureTime, disturbImage)
 					if errPass != nil {
@@ -1203,10 +1201,10 @@ func workAction(userCache *xuexitongApi.XueXiTUserCache, user *config.User, sett
 		} else if user.CoursesCustom.AutoExam == 3 {
 			err3 := question.WriteQuestionForXXTAIAction(userCache, question.ClassId, question.CourseId, question.Cpi)
 			if err3 != nil {
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "内置AI回答错误:", err3.Error())
-			}
-		}
-		//提交写的题
+				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+				return
+				}
+				_, err := videoDTO.AttachmentsDetection(card)
 		submitResult, err3 := question.SubmitWorkAnswerAction(userCache, (user.CoursesCustom.ExamAutoSubmit == 1 || user.CoursesCustom.ExamAutoSubmit == 2) && work.QuestionTotal == i+1)
 		if err3 != nil {
 			//log.Fatal(err3)
@@ -1215,10 +1213,10 @@ func workAction(userCache *xuexitongApi.XueXiTUserCache, user *config.User, sett
 
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
 	}
-	lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, "作业已完成")
-
-}
-
+	lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+	return
+	}
+	_, err := videoDTO.AttachmentsDetection(card)
 // 考试处理逻辑
 func examAction(userCache *xuexitongApi.XueXiTUserCache, user *config.User, setting config.Setting, courseItem *xuexitong.XueXiTCourse, exam xuexitong.XXTExam) {
 	lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Yellow, "正在考试中...")
@@ -1240,10 +1238,10 @@ func examAction(userCache *xuexitongApi.XueXiTUserCache, user *config.User, sett
 		} else if user.CoursesCustom.AutoExam == 3 {
 			err3 := question.WriteQuestionForXXTAIAction(userCache, question.ClassId, question.CourseId, question.Cpi)
 			if err3 != nil {
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "内置AI回答错误:", err3.Error())
-			}
-		}
-		//提交写的题
+				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
+				return
+				}
+				_, err := videoDTO.AttachmentsDetection(card)
 		isSubmit := false
 		if (user.CoursesCustom.ExamAutoSubmit == 1 || user.CoursesCustom.ExamAutoSubmit == 2) && exam.QuestionTotal == i+1 {
 			isSubmit = true //满足提交条件则提交试卷

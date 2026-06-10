@@ -3,7 +3,6 @@ package activity
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -196,7 +195,6 @@ func (activity *XXTActivity) nodeListStudy(user *config.User, userCache *xuexito
 
 	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Purple, "正在学习该课程")
 
-	var nodeLock sync.WaitGroup
 	//遍历结点
 	for index := range nodes {
 		if isFinished(index) { //如果完成了的那么直接跳过
@@ -204,7 +202,6 @@ func (activity *XXTActivity) nodeListStudy(user *config.User, userCache *xuexito
 		}
 		activity.nodeRun(userCache, courseItem, pointAction, action, nodes, index, key, courseId)
 	}
-	nodeLock.Wait()
 	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Purple, "课程学习完毕")
 }
 
@@ -234,19 +231,19 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 			userCache, key, courseId, videoDTO.KnowledgeID, videoDTO.CardIndex, courseItem.Cpi)
 		if err2 != nil {
 			if strings.Contains(err2.Error(), "章节未开放") {
-				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
+				lg.Print(lg.INFO, "[" , lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该章节未开放，可能是因为前面章节有任务点未学完导致后续任务点未开放，已自动跳过该任务点")
 				break
 			}
 			if strings.Contains(err2.Error(), "没有历史人脸") {
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-				os.Exit(0)
+				return
 			}
 			if strings.Contains(err2.Error(), "活体检测失败") {
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号所录入的人脸可能并不规范，请自行拍摄人脸放到assets/face/账号名称.jpg路径下再重试")
-				os.Exit(0)
+				return
 			}
 			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-			os.Exit(0)
+			return
 		}
 		_, err := videoDTO.AttachmentsDetection(card)
 		if err != nil {
@@ -279,10 +276,10 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 				}
 				if strings.Contains(err2.Error(), "没有历史人脸") {
 					lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
+					return
 				}
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
+				return
 			}
 			documentDTO.AttachmentsDetection(card)
 			//如果不是任务或者说该任务已完成，那么直接跳过
@@ -307,10 +304,10 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 				}
 				if strings.Contains(err2.Error(), "没有历史人脸") {
 					lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
+					return
 				}
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
+				return
 			}
 			hyperlinkDTO.AttachmentsDetection(card)
 
@@ -331,10 +328,10 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 				}
 				if strings.Contains(err2.Error(), "没有历史人脸") {
 					lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "过人脸失败，该账号可能从未进行过人脸识别，请先进行一次人脸识别后再试")
-					os.Exit(0)
+					return
 				}
 				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Red, err2.Error())
-				os.Exit(0)
+				return
 			}
 			liveDTO.AttachmentsDetection(card)
 			if !liveDTO.IsJob { //不是任务点或者已经是完成的任务点直接退出

@@ -3,6 +3,7 @@ package controller
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"time"
 	"yatori-go-console/web/service"
@@ -85,16 +86,27 @@ func (UserApi) StreamLog(c *gin.Context) {
 
 	reader := bufio.NewReader(file)
 
-	// 循环不断推送
+	// 循环不断推送，监听客户端断开
 	for {
+		select {
+		case <-c.Request.Context().Done():
+			return // 客户端断开连接，退出
+		default:
+		}
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			time.Sleep(500 * time.Millisecond)
-			continue
+			if err == io.EOF {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return // 其他文件读取错误，退出
 		}
 
 		// SSE 协议格式
-		c.Writer.Write([]byte("data: " + line + "\n\n"))
+		_, writeErr := c.Writer.Write([]byte("data: " + line + "\n\n"))
+		if writeErr != nil {
+			return // 写入失败（客户端断开），退出
+		}
 		c.Writer.Flush()
 	}
 }
