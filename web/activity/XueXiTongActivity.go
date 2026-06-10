@@ -2,7 +2,10 @@ package activity
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,9 +17,11 @@ import (
 	"github.com/yatori-dev/yatori-go-core/aggregation/xuexitong"
 	"github.com/yatori-dev/yatori-go-core/aggregation/xuexitong/point"
 	xuexitongApi "github.com/yatori-dev/yatori-go-core/api/xuexitong"
-
+	"github.com/yatori-dev/yatori-go-core/que-core/aiq"
+	"github.com/yatori-dev/yatori-go-core/que-core/external"
 	"github.com/yatori-dev/yatori-go-core/utils"
 	lg "github.com/yatori-dev/yatori-go-core/utils/log"
+	"gopkg.in/yaml.v3"
 )
 
 type XXTActivity struct {
@@ -108,6 +113,8 @@ func (activity *XXTActivity) userBlock() error {
 		// fmt.Println(course) //创建当前循环变量的独立副本
 
 		activity.nodeListStudy(&activity.User, cache, &course)
+		// 写课程的作业和考试
+		activity.writeCourseWorkAndExam(cache, &course)
 		nodesLock.Done()
 		if !activity.IsRunning { //打断
 			return nil
@@ -341,6 +348,71 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 			time.Sleep(5 * time.Second)
 		}
 	}
+	// 章测作业刷取
+	if workDTOs != nil && activity.User.CoursesCustom.AutoExam != 0 && activity.User.CoursesCustom.CxChapterTestSw != nil && *activity.User.CoursesCustom.CxChapterTestSw == 1 {
+		setting := readSetting()
+		if activity.User.CoursesCustom.AutoExam == 1 {
+			if err := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType); err != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.BoldRed, "<"+setting.AiSetting.AiType+">", "AI不可用，错误信息：", err.Error())
+				return
+			}
+		} else if activity.User.CoursesCustom.AutoExam == 2 {
+			if err := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 5, nil); err != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.BoldRed, "外挂题库不可用，错误信息：", err.Error())
+				return
+			}
+		}
+		for _, workDTO := range workDTOs {
+			if !activity.IsRunning {
+				return
+			}
+			if !workDTO.IsJob {
+				continue
+			}
+			card, _, err2 := xuexitong.PageMobileChapterCardAction(
+				userCache, key, courseId, workDTO.KnowledgeID, workDTO.CardIndex, courseItem.Cpi)
+			if err2 != nil {
+				if strings.Contains(err2.Error(), "章节未开放") {
+					break
+				}
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Red, err2.Error())
+				return
+			}
+			workDTO.AttachmentsDetection(card)
+			if !workDTO.IsJob {
+				continue
+			}
+			questionAction, err := xuexitong.ChapterTestListAction(userCache, &workDTO)
+			if err != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Red, "拉取章节作业失败:", err.Error())
+				continue
+			}
+			activity.chapterTestAction(userCache, courseItem, pointAction.Knowledge[index], *questionAction, setting)
+			time.Sleep(5 * time.Second)
+		}
+	}
+	// 讨论任务刷取
+	if bbsDTOs != nil && activity.User.CoursesCustom.AutoExam != 0 {
+		for _, bbsDTO := range bbsDTOs {
+			if !activity.IsRunning {
+				return
+			}
+			card, _, err2 := xuexitong.PageMobileChapterCardAction(
+				userCache, key, courseId, bbsDTO.KnowledgeID, bbsDTO.CardIndex, courseItem.Cpi)
+			if err2 != nil {
+				if strings.Contains(err2.Error(), "章节未开放") {
+					break
+				}
+				return
+			}
+			bbsDTO.AttachmentsDetection(card)
+			if !bbsDTO.IsJob {
+				continue
+			}
+			activity.ExecuteBBS(userCache, courseItem, pointAction.Knowledge[index], &bbsDTO)
+			time.Sleep(5 * time.Second)
+		}
+	}
 
 }
 
@@ -545,5 +617,267 @@ func ExecuteLive(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueX
 			return
 		}
 		time.Sleep(30 * time.Second)
+	}
+}
+
+// readSetting 读取配置文件中的 setting
+func readSetting() config.Setting {
+	data, err := os.ReadFile(getConfigFilePath())
+	if err != nil {
+		return config.Setting{}
+	}
+	type yamlConfig struct {
+		Setting config.Setting `yaml:"setting"`
+	}
+	var cfg yamlConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return config.Setting{}
+	}
+	return cfg.Setting
+}
+
+func getConfigFilePath() string {
+	path := os.Getenv("CONFIG_FILE_PATH")
+	if path != "" {
+		return path
+	}
+	return "./config.yaml"
+}
+
+// writeCourseWorkAndExam 写课程的作业和考试
+func (activity *XXTActivity) writeCourseWorkAndExam(userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse) {
+	user := &activity.User
+	if user.CoursesCustom.AutoExam != 1 && user.CoursesCustom.AutoExam != 2 && user.CoursesCustom.AutoExam != 3 {
+		return
+	}
+	setting := readSetting()
+	if user.CoursesCustom.AutoExam == 1 {
+		if err := aiq.AICheck(setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.APIKEY, setting.AiSetting.AiType); err != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.BoldRed, "<"+setting.AiSetting.AiType+">", "AI不可用，错误信息：", err.Error())
+			return
+		}
+	} else if user.CoursesCustom.AutoExam == 2 {
+		if err := external.CheckApiQueRequest(setting.ApiQueSetting.Url, 5, nil); err != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.BoldRed, "外挂题库不可用，错误信息：", err.Error())
+			return
+		}
+	}
+	if user.CoursesCustom.CxWorkSw != nil && *user.CoursesCustom.CxWorkSw == 1 {
+		workList, err1 := xuexitong.PullWorkListAction(userCache, *courseItem)
+		if err1 != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Red, "拉取作业列表失败,已自动跳过")
+		} else {
+			for _, work := range workList {
+				if !activity.IsRunning {
+					return
+				}
+				if !(work.Status == "待做" || work.Status == "未交" || work.Status == "待重做") {
+					continue
+				}
+				if err2 := xuexitong.EnterWorkAction(userCache, &work); err2 != nil {
+					if strings.Contains(err2.Error(), "已过时效，不能操作!") {
+						lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "该作业已过时，已自动跳过该作业...")
+						continue
+					}
+					log.Print(err2)
+					continue
+				}
+				activity.workAction(userCache, courseItem, work, setting)
+			}
+		}
+	}
+	if user.CoursesCustom.CxExamSw != nil && *user.CoursesCustom.CxExamSw == 1 {
+		examList, err1 := xuexitong.PullExamListAction(userCache, *courseItem)
+		if err1 != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Red, "拉取考试列表失败,已自动跳过")
+		} else {
+			for _, exam := range examList {
+				if !activity.IsRunning {
+					return
+				}
+				if exam.Status != "待做" && exam.Status != "待重考" {
+					continue
+				}
+				if err2 := xuexitong.EnterExamAction(userCache, &exam); err2 != nil {
+					log.Print(err2)
+					continue
+				}
+				activity.examAction(userCache, courseItem, exam, setting)
+			}
+		}
+	}
+}
+
+// workAction 作业处理逻辑
+func (activity *XXTActivity) workAction(userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, work xuexitong.XXTWork, setting config.Setting) {
+	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Yellow, "正在写作业中...")
+	for i := range work.QuestionTotal {
+		if !activity.IsRunning {
+			return
+		}
+		question, err2 := work.PullWorkQuestionAction(userCache, i)
+		if err2 != nil {
+			log.Print(err2)
+			continue
+		}
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Yellow, fmt.Sprintf("写作业状态中,正在回答第%d题", i+1))
+		switch activity.User.CoursesCustom.AutoExam {
+		case 1:
+			if err3 := question.WriteQuestionForAIAction(userCache, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, setting.AiSetting.APIKEY); err3 != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "AI回答错误:", err3.Error())
+			}
+		case 2:
+			question.WriteQuestionForExternalAction(setting.ApiQueSetting.Url)
+		case 3:
+			if err3 := question.WriteQuestionForXXTAIAction(userCache, question.ClassId, question.CourseId, question.Cpi); err3 != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "内置AI回答错误:", err3.Error())
+			}
+		}
+		isSubmit := (activity.User.CoursesCustom.ExamAutoSubmit == 1 || activity.User.CoursesCustom.ExamAutoSubmit == 2) && work.QuestionTotal == i+1
+		submitResult, err3 := question.SubmitWorkAnswerAction(userCache, isSubmit)
+		if err3 != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Red, "作业提交失败:", err3.Error())
+		}
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+	}
+	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", work.Name, "】", lg.Green, "作业已完成")
+}
+
+// examAction 考试处理逻辑
+func (activity *XXTActivity) examAction(userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, exam xuexitong.XXTExam, setting config.Setting) {
+	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Yellow, "正在考试中...")
+	for i := range exam.QuestionTotal {
+		if !activity.IsRunning {
+			return
+		}
+		question, err2 := exam.PullExamQuestionAction(userCache, i)
+		if err2 != nil {
+			log.Print(err2)
+			continue
+		}
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Yellow, fmt.Sprintf("考试状态中,正在回答第%d题,总共%d题", i+1, exam.QuestionTotal))
+		switch activity.User.CoursesCustom.AutoExam {
+		case 1:
+			if err3 := question.WriteQuestionForAIAction(userCache, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, setting.AiSetting.APIKEY); err3 != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "AI回答错误:", err3.Error())
+			}
+		case 2:
+			question.WriteQuestionForExternalAction(setting.ApiQueSetting.Url)
+		case 3:
+			if err3 := question.WriteQuestionForXXTAIAction(userCache, question.ClassId, question.CourseId, question.Cpi); err3 != nil {
+				lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "内置AI回答错误:", err3.Error())
+			}
+		}
+		isSubmit := (activity.User.CoursesCustom.ExamAutoSubmit == 1 || activity.User.CoursesCustom.ExamAutoSubmit == 2) && exam.QuestionTotal == i+1
+		submitResult, err3 := question.SubmitExamAnswerAction(userCache, isSubmit)
+		if err3 != nil {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "试卷提交失败:", err3.Error())
+		}
+		re := regexp.MustCompile(`考试(\d+)分钟内不允许提交考试`)
+		matches := re.FindStringSubmatch(submitResult)
+		if len(matches) > 1 {
+			minSubmitTime, _ := strconv.Atoi(matches[1])
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, fmt.Sprintf("检测到该考试限制开考%d分钟内不允许提交考试，已自动延时%d分钟...", minSubmitTime, minSubmitTime))
+			time.Sleep(time.Duration(minSubmitTime) * time.Minute)
+			submitResult, err3 = question.SubmitExamAnswerAction(userCache, isSubmit)
+		}
+		if strings.Contains(submitResult, "考试时间已用完,不允许提交答案!") {
+			lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Red, "试卷提交失败，考试时间已用完，已自动跳过。服务器返回信息:", submitResult)
+			break
+		}
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, fmt.Sprintf("第%d题回答成功,服务器返回:%s", i+1, submitResult))
+	}
+	lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", exam.Name, "】", lg.Green, "考试已完成")
+}
+
+// chapterTestAction 章测处理逻辑
+func (activity *XXTActivity) chapterTestAction(userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, questionAction xuexitongApi.Question, setting config.Setting) {
+	user := &activity.User
+	switch user.CoursesCustom.AutoExam {
+	case 1:
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", fmt.Sprintf("<%s>", setting.AiSetting.AiType), lg.Default, "【"+courseItem.CourseName+"】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Yellow, "正在AI自动写章节作业...")
+	case 2:
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.Default, "【"+courseItem.CourseName+"】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Yellow, "正在外挂题库自动写章节作业...")
+	case 3:
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", lg.Default, "【"+courseItem.CourseName+"】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Yellow, "正在内置AI自动写章节作业...")
+	}
+	stopStart := 1
+	stopEnd := 2
+	for i := range questionAction.Choice {
+		q := &questionAction.Choice[i]
+		switch user.CoursesCustom.AutoExam {
+		case 1:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXChoiceQue: *q})
+			q.AnswerAIGet(userCache.UserID, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, message, setting.AiSetting.APIKEY)
+		case 2:
+			q.AnswerExternalGet(setting.ApiQueSetting.Url)
+		case 3:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXChoiceQue: *q})
+			q.AnswerXXTAIGet(userCache, questionAction.ClassId, questionAction.CourseId, questionAction.Cpi, message)
+		}
+		time.Sleep(time.Duration(rand.Intn(stopEnd-stopStart)+stopStart) * time.Second)
+	}
+	for i := range questionAction.Judge {
+		q := &questionAction.Judge[i]
+		switch user.CoursesCustom.AutoExam {
+		case 1:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXJudgeQue: *q})
+			q.AnswerAIGet(userCache.UserID, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, message, setting.AiSetting.APIKEY)
+		case 2:
+			q.AnswerExternalGet(setting.ApiQueSetting.Url)
+		case 3:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXJudgeQue: *q})
+			q.AnswerXXTAIGet(userCache, questionAction.ClassId, questionAction.CourseId, questionAction.Cpi, message)
+		}
+		time.Sleep(time.Duration(rand.Intn(stopEnd-stopStart)+stopStart) * time.Second)
+	}
+	for i := range questionAction.Fill {
+		q := &questionAction.Fill[i]
+		switch user.CoursesCustom.AutoExam {
+		case 1:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXFillQue: *q})
+			q.AnswerAIGet(userCache.UserID, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, message, setting.AiSetting.APIKEY)
+		case 2:
+			q.AnswerExternalGet(setting.ApiQueSetting.Url)
+		case 3:
+			message := xuexitong.AIProblemMessage(questionAction.Title, q.Type.String(), xuexitongApi.ExamTurn{XueXFillQue: *q})
+			q.AnswerXXTAIGet(userCache, questionAction.ClassId, questionAction.CourseId, questionAction.Cpi, message)
+		}
+		time.Sleep(time.Duration(rand.Intn(stopEnd-stopStart)+stopStart) * time.Second)
+	}
+	err3 := questionAction.SubmitChapterTest(userCache)
+	if err3 != nil {
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Red, "章节作业提交失败:", err3.Error())
+	} else {
+		lg.Print(lg.INFO, "[", lg.Green, userCache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", questionAction.Title, "】", lg.Green, "章节作业已完成")
+	}
+}
+
+// ExecuteBBS 讨论任务处理
+func (activity *XXTActivity) ExecuteBBS(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, bbsDto *xuexitongApi.PointBBsDto) {
+	user := &activity.User
+	bbsTopic, err1 := point.PullPhoneBbsInfoAction(cache, bbsDto)
+	if bbsTopic == nil {
+		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", bbsDto.Title, "】", lg.BoldRed, "无法正常拉取讨论任务点主题，已自动跳过该讨论任务点...")
+		return
+	}
+	if err1 != nil {
+		lg.Print(lg.INFO, err1.Error())
+	}
+	setting := readSetting()
+	var report string
+	var err error
+	switch user.CoursesCustom.AutoExam {
+	case 1:
+		report, err = bbsTopic.AIAnswer(cache, bbsDto, setting.AiSetting.AiUrl, setting.AiSetting.Model, setting.AiSetting.AiType, setting.AiSetting.APIKEY)
+	case 2:
+		report, err = bbsTopic.ExternalAnswer(cache, bbsDto, setting.ApiQueSetting.Url)
+	case 3:
+		report, err = bbsTopic.XXTAIAnswer(cache, bbsDto)
+	}
+	if err != nil {
+		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", bbsTopic.Title, "】", lg.BoldRed, "讨论任务点学习提交接口访问异常，返回信息：", report, err.Error())
+	} else {
+		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Label, " ", knowledgeItem.Name, "】", "【", bbsTopic.Title, "】 >>> ", "讨论任务点状态：", lg.Green, gojsonq.New().JSONString(report).Find("msg").(string))
 	}
 }
