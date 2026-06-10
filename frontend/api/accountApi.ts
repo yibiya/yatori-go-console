@@ -7,6 +7,7 @@ export interface AddAccountParams {
   url:string
   account: string
   password: string
+  coursesCustom?: Record<string, any>
 }
 
 export interface AddAccountResponse {

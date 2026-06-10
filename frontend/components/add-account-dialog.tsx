@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { addAccount as apiAddAccount } from "@/api/accountApi"
 import { toast } from "@/components/ui/use-toast"
 import { PLATFORM_OPTIONS } from "@/utils/platformUtils"
+import { COURSE_PRESETS, DEFAULT_PRESET_KEY, type CoursesCustomPreset } from "@/utils/presets"
 
 type AddAccountDialogProps = {
     open: boolean
@@ -34,6 +35,7 @@ export function AddAccountDialog({ open, onOpenChange, onAdd }: AddAccountDialog
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [preset, setPreset] = useState(DEFAULT_PRESET_KEY)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -61,13 +63,17 @@ export function AddAccountDialog({ open, onOpenChange, onAdd }: AddAccountDialog
         setLoading(true)
 
         try {
-            // 调用API添加账号
-            const response = await apiAddAccount({
+            // 构建请求参数，包含预设配置
+            const apiParams: any = {
                 accountType: accountType.trim(),
                 url: accountType.trim() === "YINGHUA" ? url.trim() : "",
                 account: account.trim(),
                 password: password.trim(),
-            })
+            }
+            if (preset && COURSE_PRESETS[preset]) {
+                apiParams.coursesCustom = COURSE_PRESETS[preset].coursesCustom
+            }
+            const response = await apiAddAccount(apiParams)
 
             if (response.code===200) {
                 // API添加成功
@@ -100,6 +106,7 @@ export function AddAccountDialog({ open, onOpenChange, onAdd }: AddAccountDialog
                 setUrl("")
                 setAccount("")
                 setPassword("")
+                setPreset(DEFAULT_PRESET_KEY)
 
                 // 关闭对话框
                 onOpenChange(false)
@@ -147,6 +154,29 @@ export function AddAccountDialog({ open, onOpenChange, onAdd }: AddAccountDialog
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+
+                        {/* 配置预设 */}
+                        <div className="space-y-2">
+                            <Label htmlFor="preset">配置预设</Label>
+                            <Select value={preset} onValueChange={setPreset}>
+                                <SelectTrigger id="preset" className="w-full">
+                                    <SelectValue placeholder="默认配置（手动设置）" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={DEFAULT_PRESET_KEY}>默认配置（手动设置）</SelectItem>
+                                    {Object.entries(COURSE_PRESETS).map(([key, opt]) => (
+                                        <SelectItem key={key} value={key}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {preset && COURSE_PRESETS[preset] && (
+                                <p className="text-xs text-muted-foreground">
+                                    {COURSE_PRESETS[preset].description}
+                                </p>
+                            )}
                         </div>
 
                         {/* 仅当选择英华学堂时显示平台URL输入项 */}

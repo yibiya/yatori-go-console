@@ -83,18 +83,23 @@ func AddUserService(c *gin.Context) {
 		})
 		return
 	}
+	// 构建 CoursesCustom，优先使用请求中的预设
+	coursesCustom := config.CoursesCustom{
+		IncludeCourses:  []string{},
+		ExcludeCourses:  []string{},
+		CoursesSettings: []config.CoursesSettings{},
+	}
+	if req.CoursesCustom != nil {
+		coursesCustom = *req.CoursesCustom
+	}
 	addedUserDTO, err := upsertLocalConfigUser(dto.ConfigManagerUser{
-		AccountType:  req.AccountType,
-		URL:          req.Url,
-		Account:      req.Account,
-		Password:     req.Password,
-		IsProxy:      req.IsProxy,
-		InformEmails: []string{},
-		CoursesCustom: config.CoursesCustom{
-			IncludeCourses:  []string{},
-			ExcludeCourses:  []string{},
-			CoursesSettings: []config.CoursesSettings{},
-		},
+		AccountType:   req.AccountType,
+		URL:           req.Url,
+		Account:       req.Account,
+		Password:      req.Password,
+		IsProxy:       req.IsProxy,
+		InformEmails:  []string{},
+		CoursesCustom: coursesCustom,
 	})
 	if err != nil {
 		c.JSON(http.StatusOK, vo.Response{
