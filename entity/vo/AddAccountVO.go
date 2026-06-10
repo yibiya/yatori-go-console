@@ -5,4 +5,5 @@ type AddAccountRequest struct {
 	Url         string `json:"url"`
 	Account     string `json:"account"`  //账号
 	Password    string `json:"password"` //密码
+	IsProxy     int    `json:"isProxy"`  //是否使用代理
 }
