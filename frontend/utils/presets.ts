@@ -24,6 +24,7 @@ export const COURSE_PRESETS: Record<string, PresetOption> = {
             cxExamSw: 0,
             autoExam: 0,
             examAutoSubmit: 0,
+            videoModel: 1,
             cxNode: 3,
         },
     },
@@ -34,12 +35,13 @@ export const COURSE_PRESETS: Record<string, PresetOption> = {
             cxChapterTestSw: 1,
             cxWorkSw: 0,
             cxExamSw: 0,
-            autoExam: 0,
+            autoExam: 1,
             examAutoSubmit: 1,
+            videoModel: 1,
             cxNode: 3,
         },
     },
 }
 
 // 默认（不设置任何特殊选项，程序用默认值）
-export const DEFAULT_PRESET_KEY = ""
+export const DEFAULT_PRESET_KEY = "default"

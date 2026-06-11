@@ -16,6 +16,9 @@ const autoExecutionScheduleInterval = time.Minute
 
 var executionTimePattern = regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d$`)
 
+// startedInCurrentWindow 记录当前时间窗口内已启动过的账号，防止完成后再重启
+var startedInCurrentWindow = make(map[string]bool)
+
 func normalizeExecutionTime(value string) string {
 	return strings.TrimSpace(value)
 }
@@ -141,13 +144,22 @@ func syncAutoExecutionSchedules(now time.Time) error {
 
 		isRunning := isActivityRunningInstance(userActivity)
 		if withinWindow && !isRunning {
+			// 本窗口已启动过则不再重复启动
+			if startedInCurrentWindow[user.Uid] {
+				continue
+			}
 			startManagedActivity(user, userActivity)
+			startedInCurrentWindow[user.Uid] = true
 			continue
 		}
 		if !withinWindow && isRunning {
 			if err := (*userActivity).Stop(); err != nil {
 				lg.Print(lg.INFO, "[", lg.Yellow, user.Account, lg.Default, "] 自动执行停止失败: ", err.Error())
 			}
+		}
+		// 离开窗口时清除标记
+		if !withinWindow {
+			delete(startedInCurrentWindow, user.Uid)
 		}
 	}
 
