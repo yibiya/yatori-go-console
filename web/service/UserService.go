@@ -98,6 +98,10 @@ func AddUserService(c *gin.Context) {
 		URL:         userPo.Url,
 		Account:     userPo.Account,
 		Password:    userPo.Password,
+		IsProxy:     req.IsProxy,
+	}
+	if req.CoursesCustom != nil {
+		userConfig.CoursesCustom = *req.CoursesCustom
 	}
 
 	userConfigJson, err2 := json.Marshal(userConfig)
@@ -244,14 +248,11 @@ func LoginUserService(c *gin.Context) {
 	})
 }
 
-// 更新账号信息
+// 更新账号信息（含 coursesCustom 写回 user_config_json）
 func UpdateUserService(c *gin.Context) {
-	var req pojo.UserPO
+	var req vo.UpdateAccountRequest
 
-	// 绑定 JSON
 	if err := c.ShouldBindJSON(&req); err != nil {
-		data, _ := c.GetRawData()
-		fmt.Println(string(data))
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    400,
 			Message: "JSON 解析失败",
@@ -259,7 +260,6 @@ func UpdateUserService(c *gin.Context) {
 		return
 	}
 
-	// Uid 必须存在
 	if req.Uid == "" {
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    400,
@@ -268,33 +268,33 @@ func UpdateUserService(c *gin.Context) {
 		return
 	}
 
-	// 将结构体转为 map 并过滤空字段
-	updateMap := make(map[string]interface{})
-
-	// 手动挑选可修改字段（最安全方式）
-	if req.AccountType != "" {
-		updateMap["account_type"] = req.AccountType
+	userConfig := config.User{
+		AccountType:   req.AccountType,
+		URL:           req.Url,
+		RemarkName:    req.RemarkName,
+		Account:       req.Account,
+		Password:      req.Password,
+		IsProxy:       req.IsProxy,
+		InformEmails:  req.InformEmails,
+		CoursesCustom: req.CoursesCustom,
 	}
-	if req.Url != "" {
-		updateMap["url"] = req.Url
-	}
-	if req.Account != "" {
-		updateMap["account"] = req.Account
-	}
-	if req.Password != "" {
-		updateMap["password"] = req.Password
-	}
-
-	// 空字段检查
-	if len(updateMap) == 0 {
-		c.JSON(200, vo.Response{
+	userConfigJson, err := json.Marshal(userConfig)
+	if err != nil {
+		c.JSON(http.StatusOK, vo.Response{
 			Code:    400,
-			Message: "没有可更新的字段",
+			Message: err.Error(),
 		})
 		return
 	}
 
-	// 调用 DAO 更新
+	updateMap := map[string]interface{}{
+		"account_type":     req.AccountType,
+		"url":              req.Url,
+		"account":          req.Account,
+		"password":         req.Password,
+		"user_config_json": string(userConfigJson),
+	}
+
 	if err := dao.UpdateUser(global.GlobalDB, req.Uid, updateMap); err != nil {
 		c.JSON(http.StatusOK, vo.Response{
 			Code:    500,
