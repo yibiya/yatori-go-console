@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"yatori-go-console/config"
 	"yatori-go-console/dao"
@@ -360,18 +361,45 @@ func StartBrushService(c *gin.Context) {
 		})
 		return
 	}
-	userActivity := global.GetUserActivity(*user)
-	if userActivity != nil {
-		//userActivity.IsRunning = false
+	if user == nil {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    400,
+			Message: "该账号不存在",
+		})
+		return
 	}
+	// 活动不存在时按账号类型构建，避免对 nil 解引用导致协程 panic 拖垮整个服务
+	userActivity := global.GetUserActivity(*user)
+	if userActivity == nil {
+		created := activity.BuildUserActivity(*user)
+		if created == nil {
+			c.JSON(http.StatusOK, vo.Response{
+				Code:    400,
+				Message: "不支持的账号类型或账号配置解析失败",
+			})
+			return
+		}
+		global.PutUserActivity(*user, &created)
+		userActivity = &created
+	}
+	// 已在运行则直接返回，避免重复启动多个刷课协程
+	if (*userActivity).IsActive() {
+		c.JSON(http.StatusOK, vo.Response{
+			Code:    200,
+			Message: "任务已在运行中",
+		})
+		return
+	}
+	act := *userActivity
 	go func() {
-		// 调用Start方法
-		(*userActivity).Start()
+		if err := act.Start(); err != nil {
+			log.Printf("刷课启动失败 uid=%s: %v", uid, err)
+		}
 	}()
 
-	c.JSON(200, gin.H{
-		"code": 200,
-		"msg":  "启动成功",
+	c.JSON(http.StatusOK, vo.Response{
+		Code:    200,
+		Message: "启动成功",
 	})
 }
 
@@ -382,24 +410,23 @@ func StopBrushService(c *gin.Context) {
 		Uid: uid,
 	})
 	if err != nil {
-		c.JSON(400, gin.H{})
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: err.Error()})
+		return
 	}
 	if user == nil {
-		c.JSON(400, gin.H{})
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: "该账号不存在"})
 		return
 	}
 	userActivity := global.GetUserActivity(*user)
 	if userActivity == nil {
-		c.JSON(400, gin.H{})
+		c.JSON(http.StatusOK, vo.Response{Code: 200, Message: "任务未在运行"})
+		return
 	}
-	// 根据账号类型断言为具体活动类型并设置IsRunning
-	if xxt, ok := (*userActivity).(*activity.XXTActivity); ok {
-		xxt.IsRunning = false
-	} else if yinghua, ok := (*userActivity).(*activity.YingHuaActivity); ok {
-		yinghua.IsRunning = true
+	// 统一走 Activity.Stop() 生命周期，不再直接改写实现字段（原 yinghua 分支还把 IsRunning 误写成 true）
+	if err := (*userActivity).Stop(); err != nil {
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: err.Error()})
+		return
 	}
-	(*userActivity).Stop()
-	//userActivity.Kill()
 	c.JSON(http.StatusOK, vo.Response{
 		Code:    200,
 		Message: "停止成功",
