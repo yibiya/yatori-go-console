@@ -43,6 +43,11 @@ func (UserApi) AccountCourseListController(c *gin.Context) {
 	service.AccountCourseListService(c)
 }
 
+// 获取账号日志
+func (UserApi) AccountLogsController(c *gin.Context) {
+	service.AccountLogsService(c)
+}
+
 // 登录账号
 func (UserApi) LoginAccountController(c *gin.Context) {
 	service.LoginUserService(c)
@@ -51,6 +56,21 @@ func (UserApi) LoginAccountController(c *gin.Context) {
 // 更新账号信息
 func (UserApi) UpdateAccountController(c *gin.Context) {
 	service.UpdateUserService(c)
+}
+
+// 保存AI配置
+func (UserApi) SaveAiConfigController(c *gin.Context) {
+	service.SaveAiConfigService(c)
+}
+
+// 测试AI配置
+func (UserApi) TestAiConfigController(c *gin.Context) {
+	service.TestAiConfigService(c)
+}
+
+// 加载AI配置
+func (UserApi) GetAiConfigController(c *gin.Context) {
+	service.GetAiConfigService(c)
 }
 
 // 启动刷课接口
