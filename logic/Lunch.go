@@ -115,9 +115,11 @@ func Lunch() {
 	checkProxyIp()
 
 	//isIpProxy(&configJson)
-	//如果开启了Web模式，则直接切换Web模式
+	//如果开启了Web模式，则启动 Web 服务（账号通过 Web 管理）。
+	//注意：ServiceInit 内部会阻塞直到进程退出，因此 Web 模式下不会再执行命令行批量刷课（brushBlock）。
 	if configJson.Setting.BasicSetting.WebModel == 1 {
-		web.ServiceInit()
+		web.ServiceInit(configJson.Setting.BasicSetting)
+		return
 	}
 	brushBlock(&configJson)
 	lg.Print(lg.INFO, lg.Red, "Yatori --- ", "所有任务执行完毕")

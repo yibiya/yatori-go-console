@@ -34,6 +34,11 @@ type BasicSetting struct {
 	LogLevel       string `json:"logLevel,omitempty" yaml:"logLevel"`                         //日志等级，默认INFO，DEBUG为找BUG调式用的，日志内容较详细，默认为INFO
 	LogModel       int    `json:"logModel" yaml:"logModel"`                                   //日志模式，0代表以视频提交学时基准打印日志，1代表以一个课程为基准打印信息，默认为0
 	WebModel       int    `json:"webModel" yaml:"webModel"`
+	// 以下为 Web 模式的可选安全/网络配置，均可留空保持原有行为（向后兼容）
+	WebHost       string   `json:"webHost,omitempty" yaml:"webHost,omitempty"`             //Web 服务监听地址，默认 0.0.0.0
+	WebPort       int      `json:"webPort,omitempty" yaml:"webPort,omitempty"`             //Web 服务监听端口，默认 8080
+	AdminPassword string   `json:"adminPassword,omitempty" yaml:"adminPassword,omitempty"` //若非空，则 /api/v1 接口需通过 X-Admin-Pass 头或 admin_pass 查询参数鉴权；为空则不鉴权（默认）
+	AllowOrigins  []string `json:"allowOrigins,omitempty" yaml:"allowOrigins,omitempty"`   //CORS 允许的来源白名单；为空时默认放行 *（不带 Credentials）
 }
 type AiSetting struct {
 	AiType ctype.AiType `json:"aiType" yaml:"aiType"`
