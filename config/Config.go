@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -198,4 +199,33 @@ func StrToInt(s string) int {
 		return 0 // 其他错误处理逻辑
 	}
 	return res
+}
+
+var configWriteLock sync.Mutex
+
+// SaveRawConfigAtomic 原子写入配置文件，避免并发写或中途崩溃截断 config.yaml。
+func SaveRawConfigAtomic(path string, data []byte) error {
+	configWriteLock.Lock()
+	defer configWriteLock.Unlock()
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
