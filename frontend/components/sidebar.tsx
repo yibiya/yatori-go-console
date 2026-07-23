@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
-import { Users, FileQuestion, ChevronLeft, ChevronRight, Menu, X, Lock } from "lucide-react"
+import { Users, Bot, ChevronLeft, ChevronRight, Menu, X, Lock } from "lucide-react"
 import { ADMIN_PASS_KEY } from "@/api/base"
 
 export type SidebarTab = "accounts" | "questions"
@@ -13,16 +13,8 @@ interface SidebarProps {
 }
 
 const navItems: { id: SidebarTab; label: string; icon: typeof Users }[] = [
-  {
-    id: "accounts",
-    label: "账号管理",
-    icon: Users,
-  },
-  {
-    id: "questions",
-    label: "答题管理",
-    icon: FileQuestion,
-  },
+  { id: "accounts", label: "账号管理", icon: Users },
+  { id: "questions", label: "AI 配置", icon: Bot },
 ]
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -55,10 +47,10 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     <>
       <button
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-card border border-border shadow-lg hover:bg-accent transition-colors"
+        className="fixed left-4 top-4 z-50 rounded-xl border border-border bg-card/95 p-2.5 shadow-md backdrop-blur-sm transition-colors hover:bg-accent lg:hidden"
         aria-label="切换菜单"
       >
-        {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       {mobileMenuOpen && (
@@ -70,35 +62,37 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       <aside
         className={cn(
-          "flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out",
-          // 桌面端
+          "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
           "hidden lg:flex",
-          collapsed ? "lg:w-20" : "lg:w-64",
-          // 移动端
-          "fixed lg:relative inset-y-0 left-0 z-40",
-          "w-64",
+          collapsed ? "lg:w-[4.5rem]" : "lg:w-60",
+          "fixed inset-y-0 left-0 z-40 w-64 lg:relative",
           mobileMenuOpen ? "flex" : "hidden lg:flex",
         )}
       >
-        {/* Logo区域 */}
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-3 w-full group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition-transform group-hover:scale-105">
-              <span className="font-bold text-lg">Y</span>
+        <div className="flex items-center justify-between gap-2 border-b border-sidebar-border p-3.5">
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm transition-transform group-hover:scale-105">
+              <span className="text-sm font-bold">Y</span>
             </div>
             {!collapsed && (
-              <div className="flex-1 text-left">
-                <h2 className="text-sm font-semibold text-sidebar-foreground">Yatori</h2>
-                <p className="text-xs text-sidebar-foreground/60">课程管理系统</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-sm font-semibold text-sidebar-foreground">Yatori</h2>
+                <p className="truncate text-[11px] text-sidebar-foreground/55">课程管理控制台</p>
               </div>
             )}
           </button>
           {!collapsed && (
             <button
+              type="button"
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden lg:block p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+              className="hidden rounded-md p-1.5 text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground lg:block"
+              aria-label="收起侧栏"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -115,8 +109,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           </div>
         )}
 
-        {/* 导航菜单 - 改成纯 client state 切换，不走路由 */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 space-y-1 p-3">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
@@ -125,58 +118,49 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               <button
                 key={item.id}
                 type="button"
+                title={collapsed ? item.label : undefined}
                 onClick={() => {
                   onTabChange(item.id)
                   handleMobileNavClick()
                 }}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                    : "text-sidebar-foreground/70",
-                  collapsed ? "lg:justify-center" : "",
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  collapsed && "lg:justify-center lg:px-0",
                 )}
               >
-                <Icon className={cn("h-5 w-5 flex-shrink-0", isActive && "animate-in zoom-in-50 duration-200")} />
-                <span
-                  className={cn("font-medium text-sm animate-in fade-in-50 duration-200", collapsed && "lg:hidden")}
-                >
-                  {item.label}
-                </span>
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className={cn(collapsed && "lg:hidden")}>{item.label}</span>
               </button>
             )
           })}
         </nav>
 
-        {/* 底部信息 */}
-        <div className="p-4 border-t border-sidebar-border space-y-3">
+        <div className="space-y-3 border-t border-sidebar-border p-3">
           {!collapsed ? (
-            <div className="space-y-2 animate-in fade-in-50 duration-200">
+            <div className="space-y-2">
               <div className="relative">
-                <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sidebar-foreground/40" />
+                <Lock className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
                 <input
                   type="password"
                   value={adminPass}
                   onChange={(e) => handleAdminPassChange(e.target.value)}
                   placeholder="管理密码（可选）"
                   className={cn(
-                    "w-full pl-8 pr-2 py-1.5 text-xs rounded-md border bg-sidebar-accent/50",
+                    "w-full rounded-lg border bg-sidebar-accent/40 py-1.5 pl-8 pr-2 text-xs",
                     "border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/40",
                     "focus:outline-none focus:ring-1 focus:ring-sidebar-primary",
-                    adminPass ? "border-green-500/50" : ""
+                    adminPass && "border-emerald-500/50",
                   )}
                 />
               </div>
-              <div className="text-xs text-sidebar-foreground/50">
-                <p>版本 v1.0.0</p>
-                <p className="mt-1">© 2025 Yatori</p>
-              </div>
+              <p className="px-0.5 text-[11px] text-sidebar-foreground/45">© 2026 Yatori</p>
             </div>
           ) : (
-            <div className="hidden lg:flex flex-col items-center gap-2">
-              <div className={cn("h-2 w-2 rounded-full animate-pulse", adminPass ? "bg-green-500" : "bg-sidebar-primary")}></div>
-              <Lock className={cn("h-4 w-4", adminPass ? "text-green-500" : "text-sidebar-foreground/40")} />
+            <div className="hidden flex-col items-center gap-2 lg:flex" title={adminPass ? "已设置管理密码" : "未设置管理密码"}>
+              <Lock className={cn("h-4 w-4", adminPass ? "text-emerald-500" : "text-sidebar-foreground/40")} />
             </div>
           )}
         </div>

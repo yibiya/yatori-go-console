@@ -512,8 +512,8 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                 </div>
             </div>
 
-            <Card className="overflow-hidden border-0 shadow-lg shadow-primary/5">
-                <div className="bg-[linear-gradient(135deg,rgba(68,97,242,0.10),rgba(15,196,140,0.08),rgba(255,255,255,0.95))]">
+            <Card className="overflow-hidden border shadow-sm">
+                <div className="bg-gradient-to-br from-primary/10 via-background to-accent/5">
                     <CardHeader className="pb-8">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
                             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
@@ -560,41 +560,49 @@ export function AccountDetail({account, onBack, onUpdated}: AccountDetailProps) 
                 </div>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Card className="border-0 bg-[linear-gradient(180deg,rgba(68,97,242,0.10),rgba(255,255,255,1))] shadow-sm">
+            <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Card className="shadow-sm">
                     <CardContent className="flex items-center justify-between p-5">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">课程总数</p>
-                            <p className="mt-2 text-3xl font-semibold">{courseProgressList.length}</p>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">课程总数</p>
+                            <p className="mt-2 text-3xl font-semibold tracking-tight">{courseProgressList.length}</p>
                         </div>
-                        <BookOpen className="h-8 w-8 text-primary"/>
+                        <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+                            <BookOpen className="h-5 w-5"/>
+                        </div>
                     </CardContent>
                 </Card>
-                <Card className="border-0 bg-[linear-gradient(180deg,rgba(15,196,140,0.10),rgba(255,255,255,1))] shadow-sm">
+                <Card className="shadow-sm">
                     <CardContent className="flex items-center justify-between p-5">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">已完成</p>
-                            <p className="mt-2 text-3xl font-semibold">{completedCourses}</p>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">已完成</p>
+                            <p className="mt-2 text-3xl font-semibold tracking-tight">{completedCourses}</p>
                         </div>
-                        <Check className="h-8 w-8 text-emerald-600"/>
+                        <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:text-emerald-400">
+                            <Check className="h-5 w-5"/>
+                        </div>
                     </CardContent>
                 </Card>
-                <Card className="border-0 bg-[linear-gradient(180deg,rgba(255,184,77,0.16),rgba(255,255,255,1))] shadow-sm">
+                <Card className="shadow-sm">
                     <CardContent className="flex items-center justify-between p-5">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">进行中</p>
-                            <p className="mt-2 text-3xl font-semibold">{inProgressCourses}</p>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">进行中</p>
+                            <p className="mt-2 text-3xl font-semibold tracking-tight">{inProgressCourses}</p>
                         </div>
-                        <Gauge className="h-8 w-8 text-amber-600"/>
+                        <div className="rounded-xl bg-amber-500/10 p-2.5 text-amber-600 dark:text-amber-400">
+                            <Gauge className="h-5 w-5"/>
+                        </div>
                     </CardContent>
                 </Card>
-                <Card className="border-0 bg-[linear-gradient(180deg,rgba(95,129,255,0.10),rgba(255,255,255,1))] shadow-sm">
+                <Card className="shadow-sm">
                     <CardContent className="flex items-center justify-between p-5">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">当前视频模式</p>
-                            <p className="mt-2 text-2xl font-semibold">{currentVideoModeLabel}</p>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">视频模式</p>
+                            <p className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">{currentVideoModeLabel}</p>
                         </div>
-                        <Settings2 className="h-8 w-8 text-primary"/>
+                        <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+                            <Settings2 className="h-5 w-5"/>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card className="border-0 bg-[linear-gradient(180deg,rgba(255,122,69,0.12),rgba(255,255,255,1))] shadow-sm">

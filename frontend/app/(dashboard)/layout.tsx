@@ -45,8 +45,10 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
-      <main className="flex-1 transition-all duration-300 lg:pt-0 pt-16">
-        {activeTab === "accounts" ? <AccountList /> : <AIConfigForm />}
+      <main className="flex-1 min-w-0 pt-16 lg:pt-0">
+        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          {activeTab === "accounts" ? <AccountList /> : <AIConfigForm />}
+        </div>
       </main>
     </div>
   )

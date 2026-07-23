@@ -153,21 +153,24 @@ export function AIConfigForm(_: AIConfigFormProps = {}) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
     >
-      <div className="max-w-2xl mx-auto w-full">
-        {/* AI 模型配置 Card */}
-        <Card>
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold tracking-tight">AI 配置</h2>
+        <p className="mt-1 text-sm text-muted-foreground">自动答题所用的模型与接口凭证</p>
+      </div>
+      <div className="mx-auto w-full max-w-2xl">
+        <Card className="shadow-sm">
           <CardHeader className="px-4 sm:px-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <div className="rounded-xl bg-primary/10 p-2.5">
+                <Bot className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
               </div>
               <div>
-                <CardTitle className="text-lg sm:text-xl">AI 模型配置</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">配置用于自动答题的 AI 模型和凭证</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">模型与凭证</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">保存后写入 config.yaml，重启 yatori 生效</CardDescription>
               </div>
             </div>
           </CardHeader>
