@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	utils2 "yatori-go-console/utils"
-	//"yatori-go-console/web"
 
 	"github.com/yatori-dev/yatori-go-core/utils"
 )

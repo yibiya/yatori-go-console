@@ -16,7 +16,6 @@ import (
 	"yatori-go-console/logic/xuexitong"
 	"yatori-go-console/logic/yinghua"
 	utils2 "yatori-go-console/utils"
-	"yatori-go-console/web"
 
 	"github.com/gofrs/flock"
 	lg "github.com/yatori-dev/yatori-go-core/utils/log"
@@ -137,11 +136,6 @@ func Lunch() {
 	//是否开启IP代理池
 	checkProxyIp()
 
-	//isIpProxy(&configJson)
-	//如果开启了Web模式，则直接切换Web模式
-	if configJson.Setting.BasicSetting.WebModel == 1 {
-		web.ServiceInit()
-	}
 	brushBlock(&configJson)
 	lg.Print(lg.INFO, lg.Red, "Yatori --- ", "所有任务执行完毕")
 }
