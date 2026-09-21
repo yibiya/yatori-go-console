@@ -1,9 +1,15 @@
 package service
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 	"yatori-go-console/config"
 	"yatori-go-console/dao"
 	"yatori-go-console/entity/pojo"
@@ -325,7 +331,12 @@ func AccountCourseListService(c *gin.Context) {
 	if xxt, ok1 := (*userActivity).(activity.XXTAbility); ok1 {
 		list, err := xxt.PullCourseList()
 		if err != nil {
-			fmt.Println(err)
+			//拉取失败时返回错误码与原因，避免前端把空列表当成成功
+			c.JSON(http.StatusOK, vo.Response{
+				Code:    500,
+				Message: "拉取课程失败: " + err.Error(),
+			})
+			return
 		}
 		//转换为标准类型的列表数据
 		courseList := []vo.CourseInformResponse{}
@@ -404,4 +415,131 @@ func StopBrushService(c *gin.Context) {
 		Code:    200,
 		Message: "停止成功",
 	})
+}
+
+// accountLogUIDPattern 账号 uid 格式校验，避免拼路径时被注入
+var accountLogUIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// AccountLogsService 读取 ./assets/log 下日志，按 uid/账号/备注名过滤并脱敏，
+// 返回按时间倒序（最新在前）排列的最近 maxLines 条，供前端账号详情页展示。
+func AccountLogsService(c *gin.Context) {
+	uid := c.Param("uid")
+	if !accountLogUIDPattern.MatchString(uid) {
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: "uid 格式错误"})
+		return
+	}
+
+	user, err := dao.QueryUser(global.GlobalDB, pojo.UserPO{Uid: uid})
+	if err != nil {
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: err.Error()})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusOK, vo.Response{Code: 400, Message: "该账号不存在"})
+		return
+	}
+
+	identifiers := []string{uid, user.Account}
+	if remark := strings.TrimSpace(user.UserConfigTurnEntity().RemarkName); remark != "" && remark != user.Account {
+		identifiers = append(identifiers, remark)
+	}
+
+	logs, err := readAccountLogs("./assets/log", identifiers, 500)
+	if err != nil {
+		// 读不到日志不算接口失败：返回空列表，前端提示"暂无日志"
+		fmt.Printf("读取账号日志失败 uid=%s: %v\n", uid, err)
+	}
+
+	c.JSON(http.StatusOK, vo.Response{Code: 200, Message: "拉取日志成功", Data: map[string]any{
+		"uid":  uid,
+		"logs": logs,
+	}})
+}
+
+// readAccountLogs 扫描 log*.txt，保留含任一标识符的行，脱敏后按时间倒序（最新在前）返回最近 maxLines 条。
+func readAccountLogs(logDir string, identifiers []string, maxLines int) (string, error) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return "", err
+	}
+
+	var files []os.FileInfo
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "log") || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, info)
+	}
+	if len(files) > 0 {
+		// 旧 -> 新，配合后续按行内时间戳排序，保证输出时序稳定
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].ModTime().Before(files[j].ModTime())
+		})
+	}
+
+	var patterns []string
+	for _, id := range identifiers {
+		if id == "" {
+			continue
+		}
+		patterns = append(patterns, regexp.QuoteMeta(id))
+	}
+	if len(patterns) == 0 {
+		return "", nil
+	}
+	matchRe := regexp.MustCompile(strings.Join(patterns, "|"))
+
+	// 日志里可能出现 AI Key / 密码等敏感值，统一打码
+	desensitizeKV := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(api[_-]?key)\s*[:=]\s*[^\s]+`),
+		regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*[^\s]+`),
+		regexp.MustCompile(`(?i)(token|secret)\s*[:=]\s*[^\s]+`),
+	}
+	skRe := regexp.MustCompile(`sk-[a-zA-Z0-9]{10,}`)
+
+	var matched []string
+	for _, info := range files {
+		file, err := os.Open(filepath.Join(logDir, info.Name()))
+		if err != nil {
+			continue
+		}
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !matchRe.MatchString(line) {
+				continue
+			}
+			for _, re := range desensitizeKV {
+				line = re.ReplaceAllString(line, "$1: ***")
+			}
+			line = skRe.ReplaceAllString(line, "sk-***")
+			matched = append(matched, line)
+		}
+		file.Close()
+	}
+
+	// 多账号并发写同一文件，行序可能乱；按行内时间戳稳定排序
+	lineTS := regexp.MustCompile(`^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]`)
+	tsOf := func(s string) string {
+		if m := lineTS.FindStringSubmatch(s); m != nil {
+			return m[1]
+		}
+		return ""
+	}
+	sort.SliceStable(matched, func(i, j int) bool {
+		return tsOf(matched[i]) < tsOf(matched[j])
+	})
+	if maxLines > 0 && len(matched) > maxLines {
+		matched = matched[len(matched)-maxLines:]
+	}
+	// 前端日志视图按人类阅读习惯展示：最新一条在最上方，向上滚动回溯更早记录
+	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
+		matched[i], matched[j] = matched[j], matched[i]
+	}
+	return strings.Join(matched, "\n"), nil
 }

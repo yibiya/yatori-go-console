@@ -111,3 +111,26 @@ export const stopBrushForUid = async (uid: string): Promise<StopBrushForUidRespo
         }
     }
 }
+
+// 获取账号日志API返回结构
+export interface AccountLogsResponse {
+  code: number
+  message: string
+  data?: {
+    uid: string
+    logs: string
+  }
+}
+
+// 获取账号日志API：logs 为按时间升序的原始日志文本（换行分隔）
+export const getAccountLogs = async (uid: string): Promise<AccountLogsResponse> => {
+  try {
+    return await apiClient.get(`/v1/getAccountLogs/${uid}`) as AccountLogsResponse
+  } catch (error: any) {
+    console.error('Error in getAccountLogs:', error)
+    return {
+      code: 500,
+      message: error.response?.data?.message || '获取账号日志失败'
+    }
+  }
+}

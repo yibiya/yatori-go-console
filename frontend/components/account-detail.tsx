@@ -9,11 +9,15 @@ import {Input} from "@/components/ui/input"
 import {Checkbox} from "@/components/ui/checkbox"
 import {Progress} from "@/components/ui/progress"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
-import {ArrowLeft, Play, Pause, User, Check, BookOpen, Loader2, Eye, EyeOff, KeyRound, Leaf, Trash2, Lock, RefreshCcw} from "lucide-react"
+import {ArrowLeft, Play, Pause, User, Check, BookOpen, Loader2, Eye, EyeOff, KeyRound, Leaf, Trash2, Lock, RefreshCcw, ScrollText} from "lucide-react"
 import type {Account, Course} from "@/components/account-list"
 import {getPlatformName} from "@/utils/platformUtils"
 import {getCourseList} from "@/api/courseApi";
 import {addAccount as apiAddAccount} from "@/api";
+import {getAccountLogs} from "@/api/accountApi";
+import {LogView} from "@/components/log-view";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {cn} from "@/lib/utils";
 import {toast} from "@/components/ui/use-toast";
 
 type AccountDetailProps = {
@@ -45,6 +49,60 @@ export function AccountDetail({account, onBack}: AccountDetailProps) {
     // 分页状态
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(5);
+
+    // 日志状态
+    const [activeTab, setActiveTab] = useState("courses");
+    const [logs, setLogs] = useState("");
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [autoRefreshLogs, setAutoRefreshLogs] = useState(true);
+
+    const handleLoadLogs = useCallback(async (silent = false) => {
+        try {
+            if (!silent) {
+                setIsLoadingLogs(true)
+            }
+            const response = await getAccountLogs(account.uid)
+            if (response.code === 200) {
+                setLogs(response.data?.logs ?? "")
+                return
+            }
+            if (!silent) {
+                toast({
+                    title: "日志加载失败",
+                    description: response.message || "未获取到账号日志",
+                    variant: "destructive",
+                })
+            }
+        } catch (error) {
+            console.error("日志加载失败:", error)
+            if (!silent) {
+                toast({
+                    title: "网络错误",
+                    description: "无法加载账号日志，请稍后重试",
+                    variant: "destructive",
+                })
+            }
+        } finally {
+            if (!silent) {
+                setIsLoadingLogs(false)
+            }
+        }
+    }, [account.uid]);
+
+    // 日志 Tab 激活时才拉取；之后按开关静默轮询，避免切走还在打接口
+    useEffect(() => {
+        if (activeTab !== "logs") {
+            return
+        }
+        if (!logs) {
+            handleLoadLogs()
+        }
+        if (!autoRefreshLogs) {
+            return
+        }
+        const timer = window.setInterval(() => handleLoadLogs(true), 5000)
+        return () => window.clearInterval(timer)
+    }, [activeTab, autoRefreshLogs, logs, handleLoadLogs]);
 
     const handleLoadCourses = useCallback(async () => {
         try {
@@ -259,6 +317,20 @@ export function AccountDetail({account, onBack}: AccountDetailProps) {
                     </div>
                 </CardContent>
             </Card>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-4">
+                    <TabsTrigger value="courses" className="gap-1.5">
+                        <BookOpen className="h-3.5 w-3.5"/>
+                        课程与配置
+                    </TabsTrigger>
+                    <TabsTrigger value="logs" className="gap-1.5">
+                        <ScrollText className="h-3.5 w-3.5"/>
+                        运行日志
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="courses">
             {/* 功能配置卡片 */}
             <div className="relative mb-4 sm:mb-6">
                 <Card className="">
@@ -378,7 +450,42 @@ export function AccountDetail({account, onBack}: AccountDetailProps) {
                         <span className="text-base font-medium text-gray-800">请先取消任务</span>
                     </div>
                 )}
-            </div>
+                </div>
+                </TabsContent>
+
+                <TabsContent value="logs">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-base font-semibold text-foreground">运行日志</h3>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                连续进度行按任务点聚合，每 5 秒自动刷新。
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-muted-foreground">
+                                <input
+                                    type="checkbox"
+                                    checked={autoRefreshLogs}
+                                    onChange={(e) => setAutoRefreshLogs(e.target.checked)}
+                                    className="h-3.5 w-3.5 accent-primary"
+                                />
+                                自动刷新
+                            </label>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => handleLoadLogs()}
+                                disabled={isLoadingLogs}
+                            >
+                                <RefreshCcw className={cn("h-3.5 w-3.5", isLoadingLogs && "animate-spin")}/>
+                                刷新
+                            </Button>
+                        </div>
+                    </div>
+                    <LogView logs={logs} loading={isLoadingLogs}/>
+                </TabsContent>
+            </Tabs>
 
             <div className="relative">
                 <div
@@ -516,7 +623,7 @@ export function AccountDetail({account, onBack}: AccountDetailProps) {
                         )}
                     </>
                 )}
-            </div>
+                </div>
         </motion.div>
     )
 }

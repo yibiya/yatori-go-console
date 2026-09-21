@@ -28,6 +28,65 @@ import (
 
 var usersLock sync.WaitGroup //用户锁
 
+// pullCourseListWithRetry 拉取课程列表，网络类失败时再重试一次。
+// core 的 CourseListApi 自身有 3 次内部重试，但 CourseCompleteStatusApi
+// 签名带 retry 却从不使用，收到错误立即返回，也不支持代理，
+// 所以这里只补一次外层重试去兜住完成状态接口的抖动。
+// 关键点：失败只返回错误让本账号本轮扫描跳过，绝不能让进程退出。
+func pullCourseListWithRetry(cache *xuexitongApi.XueXiTUserCache) ([]xuexitong.XueXiTCourse, error) {
+	const coursePullMaxAttempts = 2
+	var lastErr error
+	for attempt := 1; attempt <= coursePullMaxAttempts; attempt++ {
+		courseList, err := xuexitong.XueXiTPullCourseAction(cache)
+		if err == nil {
+			return courseList, nil
+		}
+		lastErr = err
+		if !isRetryableCourseError(err) {
+			return nil, err
+		}
+		if attempt == coursePullMaxAttempts {
+			break
+		}
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", lg.Red,
+			fmt.Sprintf("拉取课程失败(第%d/%d次)，稍后重试: %v", attempt, coursePullMaxAttempts, err))
+		time.Sleep(5 * time.Second)
+	}
+	return nil, lastErr
+}
+
+// isRetryableCourseError 判断课程拉取失败是否属于可重试的网络类错误。
+// 超时、连接中断、服务端 5xx、学习通抽风页面都值得重试；
+// 解析失败、验证码失败等业务错误重试没有意义，直接交给调用方。
+func isRetryableCourseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	retryableMarks := []string{
+		"context deadline exceeded",
+		"Client.Timeout",
+		"connection reset",
+		"connection refused",
+		"EOF",
+		"timeout",
+		"no route to host",
+		"network is unreachable",
+		"i/o timeout",
+		"server misbehaving",
+		"TLS handshake timeout",
+		"proxyconnect",
+		"no such host",
+		"HTTP 5",
+	}
+	for _, mark := range retryableMarks {
+		if strings.Contains(msg, mark) {
+			return true
+		}
+	}
+	return false
+}
+
 // 用于过滤学习通账号
 func FilterAccount(configData *config.JSONDataForConfig) []config.User {
 	var users []config.User //用于收集英华账号
@@ -88,10 +147,12 @@ var model3Caches = map[string][]xuexitongApi.XueXiTUserCache{}
 
 func UserBlock(setting config.Setting, user *config.User, cache *xuexitongApi.XueXiTUserCache) {
 	// list, err := xuexitong.XueXiTCourseDetailForCourseIdAction(cache, "261619055656961")
-	courseList, err := xuexitong.XueXiTPullCourseAction(cache)
+	courseList, err := pullCourseListWithRetry(cache)
 	if err != nil {
-		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", lg.Red, "拉取课程失败")
-		log.Fatal(err)
+		//拉取失败只结束本账号本次扫描，不影响进程内其他账号
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", lg.Red, "拉取课程失败，本轮扫描跳过:", err.Error())
+		usersLock.Done()
+		return
 	}
 	//如果是多节点模式
 	if user.CoursesCustom.VideoModel == 3 {

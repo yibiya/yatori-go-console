@@ -58,6 +58,11 @@ func (UserApi) StartBrushController(c *gin.Context) {
 	service.StartBrushService(c)
 }
 
+// 获取账号日志接口
+func (UserApi) AccountLogsController(c *gin.Context) {
+	service.AccountLogsService(c)
+}
+
 // 暂停刷课接口
 func (UserApi) StopBrushController(c *gin.Context) {
 	service.StopBrushService(c)

@@ -2,8 +2,7 @@ package activity
 
 import (
 	"fmt"
-	"log"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"strconv"
 	"strings"
@@ -39,7 +38,13 @@ func (activity *XXTActivity) Login() error {
 		cache.IpProxySW = true
 		cache.ProxyIP = "http://" + utils2.RandProxyStr()
 	}
-	loginError := xuexitong.XueXiTLoginAction(cache) // 登录
+	//与命令行保持一致：password 长度超过 50 视为 cookie 登录，避免用 cookie 当密码去请求登录接口
+	var loginError error
+	if len(cache.Password) < 50 {
+		loginError = xuexitong.XueXiTLoginAction(cache) // 登录
+	} else {
+		loginError = xuexitong.XueXiTCookieLoginAction(cache) // cookie 登录
+	}
 	if loginError != nil {
 		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.White, "] ", lg.Red, loginError.Error())
 		//os.Exit(0) //登录失败直接退出
@@ -67,27 +72,99 @@ func (activity *XXTActivity) Stop() error {
 // 拉取课程列表
 func (user *XXTActivity) PullCourseList() ([]xuexitong.XueXiTCourse, error) {
 	if user.UserCache == nil { //如果为空则登录
-		user.Login()
+		if err := user.Login(); err != nil {
+			//登录失败时 UserCache 仍为 nil，必须先返回，
+			//否则下面的类型断言会 panic
+			return nil, fmt.Errorf("登录失败: %w", err)
+		}
 	}
-	cache := user.UserCache.(*xuexitongApi.XueXiTUserCache)
-	courseList, err := xuexitong.XueXiTPullCourseAction(cache)
+	cache, ok := user.UserCache.(*xuexitongApi.XueXiTUserCache)
+	if !ok || cache == nil {
+		return nil, fmt.Errorf("用户缓存未初始化")
+	}
+	courseList, err := pullCourseListWithRetry(cache)
 	if err != nil {
-		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", lg.Red, "拉取课程失败")
-		log.Fatal(err)
+		return nil, err
 	}
 	return courseList, nil
 }
 
+// pullCourseListWithRetry 拉取课程列表，网络类失败时再重试一次。
+// 拉取课程涉及两次请求：课程列表(mooc1-api)与完成状态(mooc2-ans)。
+// core 的 CourseListApi 自身有 3 次内部重试，但 CourseCompleteStatusApi
+// 签名带 retry 却从不使用，收到错误立即返回，也不支持代理，
+// 所以这里只补一次外层重试去兜住完成状态接口的抖动，
+// 避免一次超时就让整个扫描失败。绝不让进程因此退出。
+func pullCourseListWithRetry(cache *xuexitongApi.XueXiTUserCache) ([]xuexitong.XueXiTCourse, error) {
+	const maxAttempts = 2
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		courseList, err := xuexitong.XueXiTPullCourseAction(cache)
+		if err == nil {
+			return courseList, nil
+		}
+		lastErr = err
+		if !isRetryableCourseError(err) {
+			return nil, err
+		}
+		if attempt == maxAttempts {
+			break
+		}
+		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", lg.Red,
+			fmt.Sprintf("拉取课程失败(第%d/%d次)，稍后重试: %v", attempt, maxAttempts, err))
+		time.Sleep(5 * time.Second)
+	}
+	return nil, lastErr
+}
+
+// isRetryableCourseError 判断课程拉取失败是否属于可重试的网络类错误。
+// 超时、连接重置、服务端 5xx 与"页面不存在"（学习通抽风）都值得重试；
+// 解析失败、验证码失败等业务错误重试没有意义。
+func isRetryableCourseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	retryableMarks := []string{
+		"context deadline exceeded",
+		"Client.Timeout",
+		"connection reset",
+		"connection refused",
+		"EOF",
+		"timeout",
+		"no route to host",
+		"network is unreachable",
+		"i/o timeout",
+		"server misbehaving",
+		"TLS handshake timeout",
+		"proxyconnect",
+		"no such host",
+		"HTTP 5",
+	}
+	for _, mark := range retryableMarks {
+		if strings.Contains(msg, mark) {
+			return true
+		}
+	}
+	return false
+}
+
 // 直接刷课
 func (activity *XXTActivity) userBlock() {
-	cache := activity.UserCache.(*xuexitongApi.XueXiTUserCache)
-	courseList, err := xuexitong.XueXiTPullCourseAction(cache)
+	cache, ok := activity.UserCache.(*xuexitongApi.XueXiTUserCache)
+	if !ok || cache == nil {
+		//未登录或登录失败，无法开始刷课
+		lg.Print(lg.INFO, "[", lg.Green, activity.User.Account, lg.Default, "] ", lg.Red, "尚未登录成功，无法开始刷课")
+		return
+	}
+	courseList, err := pullCourseListWithRetry(cache)
 	if !activity.IsRunning { //打断
 		return
 	}
 	if err != nil {
-		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", lg.Red, "拉取课程失败")
-		log.Fatal(err)
+		//拉取失败只结束本账号本次扫描，进程与其余账号继续运行
+		lg.Print(lg.INFO, "[", lg.Green, cache.Name, lg.Default, "] ", lg.Red, "拉取课程失败，本轮扫描跳过:", err.Error())
+		return
 	}
 
 	var nodesLock sync.WaitGroup //视频锁
@@ -250,7 +327,7 @@ func (activity *XXTActivity) nodeRun(userCache *xuexitongApi.XueXiTUserCache, co
 		}
 
 		activity.ExecuteVideo2(userCache, courseItem, pointAction.Knowledge[index], &videoDTO, key, courseItem.Cpi) //普通模式
-		randSleepTime := rand.Intn(51) + 10
+		randSleepTime := rand.IntN(51) + 10
 		time.Sleep(time.Duration(randSleepTime) * time.Second)
 	}
 	// 文档类型
