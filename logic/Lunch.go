@@ -2,6 +2,7 @@ package logic
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"yatori-go-console/config"
@@ -17,6 +18,7 @@ import (
 	utils2 "yatori-go-console/utils"
 	"yatori-go-console/web"
 
+	"github.com/gofrs/flock"
 	lg "github.com/yatori-dev/yatori-go-core/utils/log"
 	"gopkg.in/yaml.v3"
 )
@@ -30,6 +32,27 @@ func fileExists(fileName string) bool {
 }
 
 func Lunch() {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		lg.Print(lg.INFO, lg.BoldRed, "启动失败，无法获取系统缓存目录：", err.Error())
+		os.Exit(1)
+	}
+	lockDir := filepath.Join(cacheDir, "yatori-go-console")
+	if err = os.MkdirAll(lockDir, 0700); err != nil {
+		lg.Print(lg.INFO, lg.BoldRed, "启动失败，无法创建运行目录：", err.Error())
+		os.Exit(1)
+	}
+	instanceLock := flock.New(filepath.Join(lockDir, "instance.lock"))
+	locked, err := instanceLock.TryLock()
+	if err != nil {
+		lg.Print(lg.INFO, lg.BoldRed, "启动失败，无法检查程序运行状态：", err.Error())
+		os.Exit(1)
+	}
+	if !locked {
+		lg.Print(lg.INFO, lg.BoldRed, "Yatori-go-console 已在运行，请勿重复启动")
+		os.Exit(1)
+	}
+	defer instanceLock.Unlock()
 
 	// 检查config.yaml是否存在
 	if !fileExists("./config.yaml") {
@@ -211,7 +234,9 @@ func configJsonCheck(configData *config.JSONDataForConfig) {
 		lg.Print(lg.INFO, lg.BoldRed, "请先在config文件中配置好相应账号")
 		os.Exit(0)
 	}
-
+	if len(configData.Users) > 5 {
+		os.Exit(0)
+	}
 	//防止用户填完整url
 	for i, v := range configData.Users {
 
