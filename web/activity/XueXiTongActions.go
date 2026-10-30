@@ -17,8 +17,26 @@ import (
 	lg "github.com/yatori-dev/yatori-go-core/utils/log"
 )
 
+// prefetchCard 拉取任务点卡片并回填附件信息（Jtoken / IsJob 等）。
+// 与 logic/xuexitong 的 CLI 实现保持一致：不先做这一步，提交接口会因为缺少 jtoken 返回"无效的请求参数"，
+// IsJob 也永远是 false，任务点会被误当成已完成而整节点跳过。
+func (activity *XXTActivity) prefetchCard(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeID, cardIndex, key, courseId int) (interface{}, error) {
+	card, _, err := xuexitong.PageMobileChapterCardAction(cache, key, courseId, knowledgeID, cardIndex, courseItem.Cpi)
+	return card, err
+}
+
 // executeDocument 文档任务点
-func (activity *XXTActivity) executeDocument(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointDocumentDto) {
+func (activity *XXTActivity) executeDocument(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointDocumentDto, key, courseId int) {
+	card, err := activity.prefetchCard(cache, courseItem, p.KnowledgeID, p.CardIndex, key, courseId)
+	if err != nil {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "拉取任务点卡片失败，已跳过：", err.Error())
+		return
+	}
+	p.AttachmentsDetection(card)
+	if !p.IsJob {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Blue, "该文档非任务点或已完成，已自动跳过")
+		return
+	}
 	report, err := point.ExecuteDocument(cache, p)
 	if err != nil || gojsonq.New().JSONString(report).Find("status") != true {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.BoldRed, "文档学习提交接口访问异常，返回信息：", report, errString(err))
@@ -28,7 +46,13 @@ func (activity *XXTActivity) executeDocument(cache *xuexitongApi.XueXiTUserCache
 }
 
 // executeHyperlink 外链任务点
-func (activity *XXTActivity) executeHyperlink(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointHyperlinkDto) {
+func (activity *XXTActivity) executeHyperlink(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointHyperlinkDto, key, courseId int) {
+	card, err := activity.prefetchCard(cache, courseItem, p.KnowledgeID, p.CardIndex, key, courseId)
+	if err != nil {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "拉取任务点卡片失败，已跳过：", err.Error())
+		return
+	}
+	p.AttachmentsDetection(card)
 	report, err := point.ExecuteHyperlink(cache, p)
 	if err != nil || gojsonq.New().JSONString(report).Find("status") != true {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.BoldRed, "外链任务点学习提交接口访问异常，返回信息：", report, errString(err))
@@ -38,7 +62,17 @@ func (activity *XXTActivity) executeHyperlink(cache *xuexitongApi.XueXiTUserCach
 }
 
 // executeLive 直播任务点
-func (activity *XXTActivity) executeLive(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointLiveDto) {
+func (activity *XXTActivity) executeLive(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointLiveDto, key, courseId int) {
+	card, err := activity.prefetchCard(cache, courseItem, p.KnowledgeID, p.CardIndex, key, courseId)
+	if err != nil {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "拉取任务点卡片失败，已跳过：", err.Error())
+		return
+	}
+	p.AttachmentsDetection(card)
+	if !p.IsJob {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Blue, "该直播非任务点或已完成，已自动跳过")
+		return
+	}
 	point.PullLiveInfoAction(cache, p)
 	if p.LiveStatusCode == 0 {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", lg.Yellow, "该直播任务点还未开播，已自动跳过")
@@ -67,7 +101,17 @@ func (activity *XXTActivity) executeLive(cache *xuexitongApi.XueXiTUserCache, co
 }
 
 // executeBBS 讨论任务点
-func (activity *XXTActivity) executeBBS(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointBBsDto, setting config.Setting) {
+func (activity *XXTActivity) executeBBS(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, p *xuexitongApi.PointBBsDto, setting config.Setting, key, courseId int) {
+	bbsCard, cardErr := activity.prefetchCard(cache, courseItem, p.KnowledgeID, p.CardIndex, key, courseId)
+	if cardErr != nil {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "拉取任务点卡片失败，已跳过：", cardErr.Error())
+		return
+	}
+	p.AttachmentsDetection(bbsCard)
+	if !p.IsJob {
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Blue, "该讨论非任务点或已完成，已自动跳过")
+		return
+	}
 	bbsTopic, err1 := point.PullPhoneBbsInfoAction(cache, p)
 	if bbsTopic == nil {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", lg.BoldRed, "无法拉取讨论任务点主题，已自动跳过")

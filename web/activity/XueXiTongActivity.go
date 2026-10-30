@@ -224,7 +224,7 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			activity.executeVideo(cache, courseItem, pointAction.Knowledge[index], videoDTO, key, courseItem.Cpi)
+			activity.executeVideo(cache, courseItem, pointAction.Knowledge[index], videoDTO, key, courseId)
 		}()
 	}
 	// 文档
@@ -233,7 +233,7 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			activity.executeDocument(cache, courseItem, pointAction.Knowledge[index], documentDTO)
+			activity.executeDocument(cache, courseItem, pointAction.Knowledge[index], documentDTO, key, courseId)
 		}()
 	}
 	// 外链
@@ -242,7 +242,7 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			activity.executeHyperlink(cache, courseItem, pointAction.Knowledge[index], hyperlinkDTO)
+			activity.executeHyperlink(cache, courseItem, pointAction.Knowledge[index], hyperlinkDTO, key, courseId)
 		}()
 	}
 	// 直播
@@ -251,7 +251,7 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			activity.executeLive(cache, courseItem, pointAction.Knowledge[index], liveDTO)
+			activity.executeLive(cache, courseItem, pointAction.Knowledge[index], liveDTO, key, courseId)
 		}()
 	}
 	// 章测
@@ -292,7 +292,7 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				activity.executeBBS(cache, courseItem, pointAction.Knowledge[index], bbsDTO, setting)
+				activity.executeBBS(cache, courseItem, pointAction.Knowledge[index], bbsDTO, setting, key, courseId)
 			}()
 		}
 	}
