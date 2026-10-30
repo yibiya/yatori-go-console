@@ -3,9 +3,11 @@ package logic
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"yatori-go-console/config"
+	"yatori-go-console/global"
 	"yatori-go-console/logic/cqie"
 	"yatori-go-console/logic/enaea"
 	"yatori-go-console/logic/haiqikeji"
@@ -16,6 +18,7 @@ import (
 	"yatori-go-console/logic/xuexitong"
 	"yatori-go-console/logic/yinghua"
 	utils2 "yatori-go-console/utils"
+	"yatori-go-console/web"
 
 	"github.com/gofrs/flock"
 	lg "github.com/yatori-dev/yatori-go-core/utils/log"
@@ -136,12 +139,43 @@ func Lunch() {
 	//是否开启IP代理池
 	checkProxyIp()
 
+	// 账号管理统一走 SQLite：首次启动把 config.yaml 的 users 迁入数据库
+	if !web.InitAccountDB(&configJson) {
+		lg.Print(lg.INFO, lg.BoldRed, "账号数据库初始化失败，无法继续")
+		os.Exit(1)
+	}
+
+	// Web 模式：账号交由数据库管理，启动面板后按账号单独启停任务
+	if configJson.Setting.BasicSetting.WebModel == 1 {
+		web.ServiceInit(configJson.Setting.BasicSetting)
+		return
+	}
+
+	// 命令行模式：账号同样来自数据库，config.yaml 的 users 段已不再生效
+	users := global.GetUsers()
+	lg.Print(lg.INFO, lg.Cyan, "已从数据库加载账号 ", strconv.Itoa(len(users)), " 个")
+	if len(users) == 0 {
+		lg.Print(lg.INFO, lg.BoldRed, "数据库中没有任何账号，请启动 Web 面板添加账号，或在 config.yaml 中配置后重启一次完成迁移")
+		os.Exit(0)
+	}
+	// 只跑启用的账号，被停用的账号直接跳过
+	enabled := make([]config.User, 0, len(users))
+	for _, u := range users {
+		if !u.IsEnabled() {
+			lg.Print(lg.INFO, lg.Yellow, "账号 [", u.Account, "] 已停用，本轮跳过")
+			continue
+		}
+		enabled = append(enabled, u)
+	}
+	configJson.Users = enabled
 	brushBlock(&configJson)
 	lg.Print(lg.INFO, lg.Red, "Yatori --- ", "所有任务执行完毕")
 }
 
 var platformLock sync.WaitGroup //平台锁
 // brushBlock 刷课执行块
+// brushBlock 命令行刷课执行块。
+// 账号来自数据库快照，逐账号按平台分发；被停用(enabled=0)的账号直接跳过。
 func brushBlock(configData *config.JSONDataForConfig) {
 	//统一登录模块------------------------------------------------------------------
 	yingHuaAccount := yinghua.FilterAccount(configData)
@@ -184,7 +218,7 @@ func brushBlock(configData *config.JSONDataForConfig) {
 	//学习通
 	platformLock.Add(1)
 	go func() {
-		xuexitong.RunBrushOperation(configData.Setting, xueXiTongAccount, xueXiTongOperation) //英华统一刷课模块
+		xuexitong.RunBrushOperation(configData.Setting, xueXiTongAccount, xueXiTongOperation) //学习通统一刷课模块
 		platformLock.Done()
 	}()
 	//码上研训
@@ -196,13 +230,13 @@ func brushBlock(configData *config.JSONDataForConfig) {
 	//WeLearn
 	platformLock.Add(1)
 	go func() {
-		welearn.RunBrushOperation(configData.Setting, welearnAccount, welearnOperation) //码上研训统一刷课模块
+		welearn.RunBrushOperation(configData.Setting, welearnAccount, welearnOperation) //WeLearn统一刷课模块
 		platformLock.Done()
 	}()
 	//icve
 	platformLock.Add(1)
 	go func() {
-		icve.RunBrushOperation(configData.Setting, icveAccount, icveOperation) //码上研训统一刷课模块
+		icve.RunBrushOperation(configData.Setting, icveAccount, icveOperation) //智慧职教(icve)统一刷课模块
 		platformLock.Done()
 	}()
 	//青书学堂
@@ -220,15 +254,10 @@ func brushBlock(configData *config.JSONDataForConfig) {
 	platformLock.Wait()
 }
 
-// configJsonCheck 配置文件检测检验
+// configJsonCheck 配置文件检测检验。
+// Web 模式下账号来自数据库（config.yaml 的 users 段只在首次启动时用于迁移），
+// 因此这里不再因 users 为空而退出，仅做 URL 归一化与代理标记。
 func configJsonCheck(configData *config.JSONDataForConfig) {
-	if len(configData.Users) == 0 {
-		lg.Print(lg.INFO, lg.BoldRed, "请先在config文件中配置好相应账号")
-		os.Exit(0)
-	}
-	if len(configData.Users) > 5 {
-		os.Exit(0)
-	}
 	//防止用户填完整url
 	for i, v := range configData.Users {
 

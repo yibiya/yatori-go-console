@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,12 @@ type BasicSetting struct {
 	LogOutFileSw   int    `json:"logOutFileSw,omitempty" yaml:"logOutFileSw"`                 //是否输出日志文件0代表不输出，1代表输出，默认为1
 	LogLevel       string `json:"logLevel,omitempty" yaml:"logLevel"`                         //日志等级，默认INFO，DEBUG为找BUG调式用的，日志内容较详细，默认为INFO
 	LogModel       int    `json:"logModel" yaml:"logModel"`                                   //日志模式，0代表以视频提交学时基准打印日志，1代表以一个课程为基准打印信息，默认为0
+	WebModel       int    `json:"webModel" yaml:"webModel"`                                   //Web 模式，1为开启 Web 面板（账号交由数据库管理），0为命令行模式，默认为0
+	// 以下为 Web 模式的可选安全/网络配置，均可留空保持原有行为（向后兼容）
+	WebHost       string   `json:"webHost,omitempty" yaml:"webHost,omitempty"`             //Web 服务监听地址，默认 0.0.0.0
+	WebPort       int      `json:"webPort,omitempty" yaml:"webPort,omitempty"`             //Web 服务监听端口，默认 8080
+	AdminPassword string   `json:"adminPassword,omitempty" yaml:"adminPassword,omitempty"` //若非空，则 /api/v1 接口需通过 X-Admin-Pass 头或 admin_pass 查询参数鉴权；为空则不鉴权（默认）
+	AllowOrigins  []string `json:"allowOrigins,omitempty" yaml:"allowOrigins,omitempty"`   //CORS 允许的来源白名单；为空时默认放行 *（不带 Credentials）
 }
 type AiSetting struct {
 	AiType ctype.AiType `json:"aiType" yaml:"aiType"`
@@ -56,28 +63,57 @@ type CoursesSettings struct {
 	ExcludeExams []string `json:"excludeExams" yaml:"excludeExams"`
 }
 type CoursesCustom struct {
-	StudyTime       string            `json:"studyTime" yaml:"studyTime"`             //WeLearn设置刷学时的时候范围
-	CxNode          *int              `json:"cxNode" yaml:"cxNode"`                   //学习通多任务点模式下设置同时任务点数量
-	CxChapterTestSw *int              `json:"cxChapterTestSw" yaml:"cxChapterTestSw"` //学习通是否开启章测
-	CxWorkSw        *int              `json:"cxWorkSw" yaml:"cxWorkSw"`               //学习通是否开启作业
-	CxExamSw        *int              `json:"cxExamSw" yaml:"cxExamSw"`               //学习通是否开启考试
-	ShuffleSw       int               `json:"shuffleSw" yaml:"shuffleSw"`             //是否打乱顺序学习，1为打乱顺序，0为不打乱
-	VideoModel      int               `json:"videoModel" yaml:"videoModel"`           //观看视频模式
-	AutoExam        int               `json:"autoExam" yaml:"autoExam"`               //是否自动考试
-	ExamAutoSubmit  int               `json:"examAutoSubmit" yaml:"examAutoSubmit"`   //是否自动提交试卷
-	ExcludeCourses  []string          `json:"excludeCourses" yaml:"excludeCourses"`
-	IncludeCourses  []string          `json:"includeCourses" yaml:"includeCourses"`
-	CoursesSettings []CoursesSettings `json:"coursesSettings" yaml:"coursesSettings"`
+	StudyTime        string            `json:"studyTime" yaml:"studyTime"`             //WeLearn设置刷学时的时候范围
+	CxNode           *int              `json:"cxNode" yaml:"cxNode"`                   //学习通多任务点模式下设置同时任务点数量
+	CxChapterTestSw  *int              `json:"cxChapterTestSw" yaml:"cxChapterTestSw"` //学习通是否开启章测
+	CxWorkSw         *int              `json:"cxWorkSw" yaml:"cxWorkSw"`               //学习通是否开启作业
+	CxExamSw         *int              `json:"cxExamSw" yaml:"cxExamSw"`               //学习通是否开启考试
+	ShuffleSw        int               `json:"shuffleSw" yaml:"shuffleSw"`             //是否打乱顺序学习，1为打乱顺序，0为不打乱
+	VideoModel       int               `json:"videoModel" yaml:"videoModel"`           //观看视频模式
+	AutoExam         int               `json:"autoExam" yaml:"autoExam"`               //是否自动考试
+	ExamAutoSubmit   int               `json:"examAutoSubmit" yaml:"examAutoSubmit"`   //是否自动提交试卷
+	ExcludeCourses   []string          `json:"excludeCourses" yaml:"excludeCourses"`
+	IncludeCourses   []string          `json:"includeCourses" yaml:"includeCourses"`
+	CoursesSettings  []CoursesSettings `json:"coursesSettings" yaml:"coursesSettings"`
+	AutoRunStartTime string            `json:"autoRunStartTime" yaml:"autoRunStartTime"` //自动刷课开始时间，格式 HH:mm，留空表示不限制
+	AutoRunEndTime   string            `json:"autoRunEndTime" yaml:"autoRunEndTime"`     //自动刷课结束时间，格式 HH:mm，留空表示不限制
 }
 type User struct {
-	AccountType   string        `json:"accountType" yaml:"accountType"`
-	URL           string        `json:"url"`
-	RemarkName    string        `json:"remarkName,omitempty" yaml:"remarkName,omitempty" mapstructure:"remarkName"` //可选备注名
-	Account       string        `json:"account"`
-	Password      string        `json:"password"`
-	IsProxy       int           `json:"isProxy" yaml:"isProxy"` //是否代理IP
+	AccountType string `json:"accountType" yaml:"accountType"`
+	URL         string `json:"url"`
+	RemarkName  string `json:"remarkName,omitempty" yaml:"remarkName,omitempty" mapstructure:"remarkName"` //可选备注名
+	Account     string `json:"account"`
+	Password    string `json:"password"`
+	IsProxy     int    `json:"isProxy" yaml:"isProxy"` //是否代理IP
+	// 是否启用该账号，1为启用，0为停用（跳过该账号）。
+	// 用指针区分"显式停用"和"老数据没这个字段"：老账号 JSON 反序列化后为 nil，
+	// 由 NormalizeUser 默认启用，避免历史账号一进面板就显示成已停用。
+	Enabled       *int          `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	InformEmails  []string      `json:"informEmails" yaml:"informEmails"`
 	CoursesCustom CoursesCustom `json:"coursesCustom" yaml:"coursesCustom"`
+}
+
+// IsEnabled 账号是否启用。老数据未设置 enabled 时按启用处理。
+func (u *User) IsEnabled() bool {
+	return u.Enabled == nil || *u.Enabled == 1
+}
+
+// SetEnabled 显式设置启用状态
+func (u *User) SetEnabled(on bool) {
+	v := 0
+	if on {
+		v = 1
+	}
+	u.Enabled = &v
+}
+
+// NewEnabled 构造带 enabled 字段的账号（迁移/新增时确保字段显式存在）
+func NewEnabled(on bool) *int {
+	v := 0
+	if on {
+		v = 1
+	}
+	return &v
 }
 
 var (
@@ -172,6 +208,35 @@ func ReadConfig(filePath string) JSONDataForConfig {
 		log.Fatal(err)
 	}
 	return configJson
+}
+
+var configWriteLock sync.Mutex
+
+// SaveRawConfigAtomic 原子写入配置文件，避免并发写或中途崩溃截断 config.yaml。
+func SaveRawConfigAtomic(path string, data []byte) error {
+	configWriteLock.Lock()
+	defer configWriteLock.Unlock()
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // CmpCourse 比较是否存在对应课程,匹配上了则true，没有匹配上则是false

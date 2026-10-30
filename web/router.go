@@ -1,0 +1,28 @@
+package web
+
+import "yatori-go-console/web/controller"
+
+// ApiV1Router 业务接口路由
+func (router Group) ApiV1Router() {
+	var userApi controller.UserApi
+	router.GET("/v1/accountList", userApi.AccountListController)                      //拉取账号列表
+	router.POST("/v1/addAccount", userApi.AddAccountController)                       //添加账号
+	router.POST("/v1/deleteAccount", userApi.DeleteAccountController)                 //删除账号
+	router.POST("/v1/updateAccount", userApi.UpdateAccountController)                 //修改账号基础信息
+	router.POST("/v1/accountLoginCheck", userApi.AccountLoginCheckController)         //账号登录检测，用于检测账号密码是否正确
+	router.GET("/v1/getAccountInformForUid/:uid", userApi.GetAccountInformController) //拉取账号配置
+	router.POST("/v1/saveAccountConfig", userApi.SaveAccountConfigController)         //保存账号刷课配置 + 启停时间窗口
+	router.GET("/v1/getAccountConfig/:uid", userApi.GetAccountConfigController)       //拉取账号刷课配置
+	router.POST("/v1/toggleAccountEnabled", userApi.ToggleAccountEnabledController)   //启用/停用单个账号
+
+	router.GET("/v1/getAccountCourseList/:uid", userApi.AccountCourseListController) //获取课程列表
+	router.GET("/v1/getAccountLogs/:uid", userApi.AccountLogsController)             //获取账号日志
+	router.GET("/v1/startBrush/:uid", userApi.StartBrushController)                  //启动刷课
+	router.GET("/v1/stopBrush/:uid", userApi.StopBrushController)                    //停止刷课
+
+	router.GET("/v1/streamLog/:id", userApi.StreamLog) //推送日志
+
+	router.POST("/v1/saveAiConfig", userApi.SaveAiConfigController) //保存AI配置
+	router.POST("/v1/testAiConfig", userApi.TestAiConfigController) //测试AI配置
+	router.GET("/v1/getAiConfig", userApi.GetAiConfigController)    //加载AI配置
+}
