@@ -1,6 +1,7 @@
 package xuexitong
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -314,8 +315,11 @@ func chapterStudy(setting config.Setting, user *config.User, userCache *xuexiton
 		}
 
 		if err != nil {
-			if strings.Contains(err.Error(), "课程章节为空") {
-				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(userCache.Name), lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "该课程章节为空已自动跳过")
+			// 章节为空是正常状态（老师建了课但没放内容），不是故障：
+			// 用普通信息色呈现，与「该课程已经结束」同档，避免淹没真正的错误。
+			var emptyChapters xuexitong.ChaptersEmpty
+			if errors.As(err, &emptyChapters) {
+				lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(userCache.Name), lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.Blue, "该课程暂无章节内容，已自动跳过")
 				return
 			}
 			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(userCache.Name), lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "拉取章节信息接口访问异常，若需要继续可以配置中添加排除此异常课程。返回信息：", err.Error())

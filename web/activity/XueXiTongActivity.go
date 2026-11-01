@@ -155,6 +155,15 @@ func (activity *XXTActivity) nodeListStudy(cache *xuexitongApi.XueXiTUserCache, 
 		return
 	}
 	if err != nil {
+		// 章节为空是正常状态，不是拉取失败：老师建了课但没往章节里放内容。
+		// 课程列表接口的 jobcount 同时为 0，两个独立接口互相印证
+		// （实测 2026-11-01，53 门课里 24 门如此）。用信息级日志，
+		// 避免每轮刷课刷出十几条红字把真故障淹没。
+		var emptyChapters xuexitong.ChaptersEmpty
+		if errors.As(err, &emptyChapters) {
+			lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.Blue, "该课程暂无章节内容，已自动跳过")
+			return
+		}
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.BoldRed, "拉取章节信息失败，已跳过该课程：", err.Error())
 		return
 	}
