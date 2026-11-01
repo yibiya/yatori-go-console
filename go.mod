@@ -84,3 +84,12 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
+
+// fork 补丁版 core（分支 fix/xuexitong-captcha）：
+//   1. 修复学习通图片验证码永远判失败的三处缺陷
+//   2. 识别 downloadfile / ballchart 资源条目，不再刷「未知的任务点类型」
+// 上游尚未修复，见 yibiya/yatori-go-core@4083a8f。
+// 生产/构建：指向本地 checkout 的 fork 分支（git clone yibiya/yatori-go-core
+// 后切到 fix/xuexitong-captcha，放在仓库同级目录）。
+// 该分支对应远端 commit 4083a8fff2294c0ccc708a0c9e6d943335423e38。
+replace github.com/yatori-dev/yatori-go-core => ../../yatori-go-core-patched

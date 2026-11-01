@@ -398,7 +398,7 @@ func chapterStudy(setting config.Setting, user *config.User, userCache *xuexiton
 // 任务点分流运行
 func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse,
 	pointAction xuexitong.ChaptersList, action xuexitong.ChaptersList, nodes []int, index int, key int, courseId int) {
-	_, fetchCards, err1 := xuexitong.ChapterFetchCardsAction(userCache, &action, nodes, index, courseId, key, courseItem.Cpi)
+	_, fetchCards, resourceDTOs, err1 := xuexitong.ChapterFetchCardsAction(userCache, &action, nodes, index, courseId, key, courseItem.Cpi)
 	if err1 != nil {
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(userCache.Name), lg.Default, "] ", `[`, courseItem.CourseName, `] `, lg.BoldRed, "无法正常拉取卡片信息，请联系作者查明情况,报错信息：", err1.Error())
 		return
@@ -406,9 +406,14 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 
 	videoDTOs, workDTOs, documentDTOs, hyperlinkDTOs, liveDTOs, bbsDTOs := xuexitongApi.ParsePointDto(fetchCards)
 	if videoDTOs == nil && workDTOs == nil && documentDTOs == nil && hyperlinkDTOs == nil && liveDTOs == nil && bbsDTOs == nil {
+		// 只剩资料下载/知识点球图这类资源条目时，仍然要执行一遍访问上报，
+		// 否则这类章节永远停在「有任务点未完」，笔记里也不会留下记录。
+		runResourcePoints(userCache, courseItem, pointAction.Knowledge[index], resourceDTOs)
 		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr[user.AccountType]), "[", lg.Green, config.DisplayAccount(userCache.Name), lg.Default, "] ", `[`, courseItem.CourseName, `] `, `[`, pointAction.Knowledge[index].Name, `] `, lg.Blue, "课程对应章节无任何任务节点，已自动跳过")
 		return
 	}
+	// 资源型条目（资料下载 / 知识点球图）与常规任务点并行处理
+	runResourcePoints(userCache, courseItem, pointAction.Knowledge[index], resourceDTOs)
 	// 视屏类型
 	if videoDTOs != nil && user.CoursesCustom.VideoModel != 0 {
 		for _, videoDTO := range videoDTOs {
@@ -624,6 +629,29 @@ func nodeRun(setting config.Setting, user *config.User, userCache *xuexitongApi.
 			ExecuteBBS(user, userCache, setting, courseItem, pointAction.Knowledge[index], &bbsDTO)
 			time.Sleep(5 * time.Second)
 		}
+	}
+}
+
+// runResourcePoints 处理章节里的资源型条目（资料下载 / 知识点球图）。
+//
+// 这类条目没有 jobid，学习通没有 /ananas/job/xxx 提交接口，
+// 只能走 /knowledge/save-attachment-downloader 记录访问（见 point.ExecuteResource）。
+// 失败不影响整章刷取，只记日志。
+func runResourcePoints(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, resources []xuexitongApi.PointResourceDto) {
+	for i := range resources {
+		r := &resources[i]
+		if !point.HasReportableContent(r) {
+			continue
+		}
+		report, err := point.ExecuteResource(cache, r)
+		if err != nil {
+			lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr["XUEXITONG"]), "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ",
+				"【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "资料下载记录异常：", err.Error())
+			continue
+		}
+		lg.Print(lg.INFO, fmt.Sprintf("[%s]", global.AccountTypeStr["XUEXITONG"]), "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ",
+			"【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Green, "资料下载已记录：", r.Title, " ", report)
+		time.Sleep(2 * time.Second)
 	}
 }
 

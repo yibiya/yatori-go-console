@@ -334,3 +334,28 @@ func ensureAnswerBackend(setting config.Setting, autoExam int) error {
 	}
 	return nil
 }
+
+// executeResources 处理资源型条目（资料下载 / 知识点球图）。
+//
+// 这类条目在章节卡片里没有 jobid，学习通没有 /ananas/job/xxx 提交接口，
+// 只能通过 /knowledge/save-attachment-downloader 记录一次访问
+// （前端点下载时调的就是它，见 ananas/videojs-ext/recordDownloadInfo.js）。
+// 失败不中断整章，只记日志。
+func (activity *XXTActivity) executeResources(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, knowledgeItem xuexitong.KnowledgeItem, resources []xuexitongApi.PointResourceDto) {
+	for i := range resources {
+		if !activity.IsRunning {
+			return
+		}
+		r := &resources[i]
+		if !point.HasReportableContent(r) {
+			continue
+		}
+		report, err := point.ExecuteResource(cache, r)
+		if err != nil {
+			lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Red, "资料下载记录异常：", err.Error())
+			continue
+		}
+		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "【", courseItem.CourseName, "】", "【", knowledgeItem.Name, "】", lg.Green, "资料下载已记录：", r.Title, " ", report)
+		time.Sleep(2 * time.Second)
+	}
+}

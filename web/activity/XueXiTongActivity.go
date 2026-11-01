@@ -203,7 +203,7 @@ func (activity *XXTActivity) nodeListStudy(cache *xuexitongApi.XueXiTUserCache, 
 
 // nodeRun 任务点分流运行
 func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, courseItem *xuexitong.XueXiTCourse, pointAction xuexitong.ChaptersList, action xuexitong.ChaptersList, nodes []int, index, key, courseId int) {
-	_, fetchCards, err1 := xuexitong.ChapterFetchCardsAction(cache, &action, nodes, index, courseId, key, courseItem.Cpi)
+	_, fetchCards, resourceDTOs, err1 := xuexitong.ChapterFetchCardsAction(cache, &action, nodes, index, courseId, key, courseItem.Cpi)
 	if err1 != nil {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "[", courseItem.CourseName, "] ", lg.BoldRed, "无法拉取卡片信息，已跳过该任务点：", err1.Error())
 		return
@@ -212,6 +212,8 @@ func (activity *XXTActivity) nodeRun(cache *xuexitongApi.XueXiTUserCache, course
 	if !activity.IsRunning {
 		return
 	}
+	// 资源型条目（资料下载 / 知识点球图）单独处理：没有 jobid，走访问记录接口
+	activity.executeResources(cache, courseItem, pointAction.Knowledge[index], resourceDTOs)
 	if videoDTOs == nil && workDTOs == nil && documentDTOs == nil && hyperlinkDTOs == nil && liveDTOs == nil && bbsDTOs == nil {
 		lg.Print(lg.INFO, "[", lg.Green, config.DisplayAccount(cache.Name), lg.Default, "] ", "[", courseItem.CourseName, "] ", "[", pointAction.Knowledge[index].Name, "] ", lg.Blue, "课程对应章节无任何任务节点，已自动跳过")
 		return
